@@ -2,7 +2,6 @@ package Sockets;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 public class RandomServer
@@ -12,11 +11,12 @@ public class RandomServer
 	private static final int port = 90;
 	private static TCPSocket incoming;
 	private static ServerSocket serverSocket;
-	private static boolean listen = true;
+	private static boolean listen;
 	
 	public static void main(String[] args)
 	{
 		sessions = new ArrayList<ServerThread>();
+		listen = true;
 		
 		try
 		{
