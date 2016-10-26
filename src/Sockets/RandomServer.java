@@ -2,12 +2,12 @@ package Sockets;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
-import java.util.Random;
 
 public class RandomServer
 {	
-	public static List<Thread> sessions;
+	public static List<ServerThread> sessions;
 	
 	private static final int port = 90;
 	private static TCPSocket incoming;
@@ -16,7 +16,7 @@ public class RandomServer
 	
 	public static void main(String[] args)
 	{
-		sessions = new ArrayList<Thread>();
+		sessions = new ArrayList<ServerThread>();
 		
 		try
 		{
@@ -48,8 +48,10 @@ class ServerThread extends Thread
 	public TCPSocket incoming;
 	public byte[] received;
 	public byte[] sending;
-	private byte size;
-	public boolean user;
+	
+	private boolean user;
+	private int size;
+	private int location;
 	
 	public ServerThread(TCPSocket subject)
 	{
@@ -58,8 +60,9 @@ class ServerThread extends Thread
 	
 	public void start()
 	{
-		size = (byte) RandomServer.sessions.size();
+		size = RandomServer.sessions.size();
 		user = true;
+		location = size - 1;
 	}
 	
 	@Override
@@ -70,6 +73,10 @@ class ServerThread extends Thread
 			try
 			{
 				received = incoming.receivePacket();
+				if (received[0] == 0)
+				{
+					serverSend(received);
+				}
 			}
 			catch (IOException e)
 			{
@@ -78,8 +85,8 @@ class ServerThread extends Thread
 			
 			if (size != RandomServer.sessions.size())
 			{
-				size = (byte) RandomServer.sessions.size();
-				sending = new byte[] {2, (byte) size};
+				size = RandomServer.sessions.size();
+				sending = new byte[] {2, -1, (byte) location, (byte) size};
 				try
 				{
 					incoming.sendPacket(sending);
@@ -107,11 +114,18 @@ class ServerThread extends Thread
 	
 	public void serverSend (byte[] data)
 	{
-		
+		RandomServer.sessions.get(data[1]).serverReceive(data);
 	}
 	
 	public void serverReceive (byte[] data)
 	{
-		
+		try
+		{
+			incoming.sendPacket(data);
+		}
+		catch (IOException e)
+		{
+			e.printStackTrace();
+		}
 	}
 }
