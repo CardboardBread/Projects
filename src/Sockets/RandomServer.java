@@ -40,6 +40,18 @@ public class RandomServer
 				e.printStackTrace();
 			}
 		}
+		
+		if (!listen)
+		{
+			try
+			{
+				serverSocket.close();
+			}
+			catch (IOException e)
+			{
+				e.printStackTrace();
+			}
+		}
 	}
 }
 

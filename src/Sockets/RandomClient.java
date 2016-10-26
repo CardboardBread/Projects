@@ -38,6 +38,18 @@ public class RandomClient
 				send((byte) rand.nextInt());
 			}
 		}
+		
+		if (!listen)
+		{
+			try
+			{
+				socket.getSocket().close();
+			}
+			catch (IOException e)
+			{
+				e.printStackTrace();
+			}
+		}
 	}
 	
 	public static void receive (byte[] data)
