@@ -51,6 +51,10 @@ public class RandomServer
 				System.out.println("Failed to accept client.");
 				e.printStackTrace();
 			}
+			finally
+			{
+				globalUpdate();
+			}
 		}
 		
 		if (!listen)
@@ -64,6 +68,14 @@ public class RandomServer
 			{
 				e.printStackTrace();
 			}
+		}
+	}
+	
+	public static void globalUpdate ()
+	{
+		for (ServerThread thread : sessions)
+		{
+			thread.userUpdate();
 		}
 	}
 }
@@ -86,18 +98,14 @@ class ServerThread extends Thread
 	@Override
 	public void run()
 	{			
-		userUpdate();
+		size = (byte) RandomServer.sessions.size();
+		location = (byte) (size - 1);
 		while (user)
 		{
 			try
-			{
-				if (size != RandomServer.sessions.size())
-				{
-					userUpdate();
-				}
-				
+			{	
 				received = incoming.receivePacket();
-				System.out.println("Server " + location + " sending packet to Server " + received[1] + ".");
+				//System.out.println("Server " + location + " sending packet to Server " + received[1] + ".");
 				if (received[0] == 0)
 				{
 					serverSend(received);
@@ -131,7 +139,7 @@ class ServerThread extends Thread
 	
 	public void serverReceive (byte[] data)
 	{
-		System.out.println("Server " + location + " receiving packet from Server " + data[2] + ".");
+		//System.out.println("Server " + location + " receiving packet from Server " + data[2] + ".");
 		try
 		{
 			incoming.sendPacket(data);
@@ -145,9 +153,8 @@ class ServerThread extends Thread
 	public void userUpdate ()
 	{
 		size = (byte) RandomServer.sessions.size();
-		location = (byte) (size - 1);
 		sending = new byte[] {1, location, location, size};
-		System.out.println("Sending userlist to client.");
+		System.out.println("Sending userlist to client " + location +  ".");
 		try
 		{
 			incoming.sendPacket(sending);
