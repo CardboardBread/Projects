@@ -1,14 +1,20 @@
 package Sockets;
 import java.io.IOException;
 import java.net.ServerSocket;
+import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
+
+// First byte is packet type [0]
+// Second byte is destination id [1]
+// Third byte is source id [2]
+// Fourth byte is data [3]
 
 public class RandomServer
 {	
 	public static List<ServerThread> sessions;
 	
-	private static final int port = 90;
+	private static final int PORT = 90;
 	private static TCPSocket incoming;
 	private static ServerSocket serverSocket;
 	private static boolean listen;
@@ -20,10 +26,12 @@ public class RandomServer
 		
 		try
 		{
-			serverSocket = new ServerSocket(port);
+			serverSocket = new ServerSocket(PORT);
+			System.out.println("Starting server on port " + PORT + ".");
 		}
 		catch (IOException e)
 		{
+			System.out.println("Failed to bind server to port" + PORT + ".");
 			e.printStackTrace();
 		}
 		
@@ -31,12 +39,16 @@ public class RandomServer
 		{
 			try
 			{
-				incoming = new TCPSocket(serverSocket.accept());
-				sessions.add(new ServerThread(incoming));
-				sessions.get(sessions.size() - 1).run();
+				Socket accept = serverSocket.accept();
+				incoming = new TCPSocket(accept);
+				ServerThread server = new ServerThread(incoming);
+				server.start();
+				sessions.add(server);
+				System.out.println("Accepted connection from client " + (sessions.size() - 1) + ".");
 			}
 			catch (IOException e)
 			{
+				System.out.println("Failed to accept client.");
 				e.printStackTrace();
 			}
 		}
@@ -46,6 +58,7 @@ public class RandomServer
 			try
 			{
 				serverSocket.close();
+				System.out.println("Closing server.");
 			}
 			catch (IOException e)
 			{
@@ -61,30 +74,30 @@ class ServerThread extends Thread
 	public byte[] received;
 	public byte[] sending;
 	
-	private boolean user;
-	private int size;
-	private int location;
+	private boolean user = true;
+	private byte size;
+	private byte location;
 	
 	public ServerThread(TCPSocket subject)
 	{
 		incoming = subject;
 	}
-	
-	public void start()
-	{
-		size = RandomServer.sessions.size();
-		user = true;
-		location = size - 1;
-	}
-	
+
 	@Override
 	public void run()
 	{			
+		userUpdate();
 		while (user)
 		{
 			try
 			{
+				if (size != RandomServer.sessions.size())
+				{
+					userUpdate();
+				}
+				
 				received = incoming.receivePacket();
+				System.out.println("Server " + location + " sending packet to Server " + received[1] + ".");
 				if (received[0] == 0)
 				{
 					serverSend(received);
@@ -93,20 +106,7 @@ class ServerThread extends Thread
 			catch (IOException e)
 			{
 				e.printStackTrace();
-			}
-			
-			if (size != RandomServer.sessions.size())
-			{
-				size = RandomServer.sessions.size();
-				sending = new byte[] {2, -1, (byte) location, (byte) size};
-				try
-				{
-					incoming.sendPacket(sending);
-				}
-				catch (IOException e)
-				{
-					e.printStackTrace();
-				}
+				System.exit(0);
 			}
 			
 			if (incoming.getSocket().isClosed())
@@ -131,9 +131,26 @@ class ServerThread extends Thread
 	
 	public void serverReceive (byte[] data)
 	{
+		System.out.println("Server " + location + " receiving packet from Server " + data[2] + ".");
 		try
 		{
 			incoming.sendPacket(data);
+		}
+		catch (IOException e)
+		{
+			e.printStackTrace();
+		}
+	}
+	
+	public void userUpdate ()
+	{
+		size = (byte) RandomServer.sessions.size();
+		location = (byte) (size - 1);
+		sending = new byte[] {1, location, location, size};
+		System.out.println("Sending userlist to client.");
+		try
+		{
+			incoming.sendPacket(sending);
 		}
 		catch (IOException e)
 		{

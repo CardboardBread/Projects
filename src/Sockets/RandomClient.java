@@ -6,81 +6,156 @@ import java.util.Random;
 
 public class RandomClient
 {
-	private static final int port = 90;
-	private static final String address = "localhost";
-	private static boolean listen = true;
-	private static byte userCount = -1;
-	private static byte userTarget;
-	private static byte location;
+	public static byte target = -1;
+	public static TCPSocket socket;
+	public static byte location;
 	
-	public static byte[] received;
-	public static byte[] sending;
+	private static final int PORT = 90;
+	private static final String SERVER_ADDRESS = "localhost";
+	private static ReceiveThread receive;
+	private static SendThread send;
 	
-	public static void main(String[] args) throws IOException
+	public static void main(String[] args) throws IOException, InterruptedException
 	{
-		TCPSocket socket = new TCPSocket(new Socket(address, port));
-		Random rand = new Random();
-		
+		socket = new TCPSocket(new Socket(SERVER_ADDRESS, PORT));
+		receive = new ReceiveThread();
+		send = new SendThread();
+		receive.start();
+		send.start();
+	}
+	
+	public static void leave ()
+	{
+		try
+		{
+			socket.getSocket().close();
+		}
+		catch (IOException e)
+		{
+			e.printStackTrace();
+		}
+	}
+}
+
+class ReceiveThread extends Thread
+{
+	private byte[] received;
+	private byte userCount;
+	private byte location;
+	private boolean listen;
+	
+	public void run()
+	{
+		listen = true;
+		userCount = 0;
 		while (listen)
 		{
 			try
 			{
-				received = socket.receivePacket();
+				received = RandomClient.socket.receivePacket();
+				receive(received);
 			}
 			catch (IOException e)
 			{
 				e.printStackTrace();
-			}
-			
-			if (userCount != -1)
-			{
-				sendTarget(userCount);
-				send((byte) rand.nextInt());
-			}
-		}
-		
-		if (!listen)
-		{
-			try
-			{
-				socket.getSocket().close();
-			}
-			catch (IOException e)
-			{
-				e.printStackTrace();
+				System.exit(0);
 			}
 		}
 	}
 	
-	public static void receive (byte[] data)
+	private void receive (byte[] data)
 	{
-		int origin = data[2];
-		int destination = data[1];
+		byte packetType = data[0];
+		byte destination = data[1];
+		byte origin = data[2];
+		byte dataVal = data[3];
 		
-		switch (data[0])
+		switch (packetType)
 		{
 		case 0: // send
-			System.out.println("Received an invalid packet " + data[4]);
+			System.out.println("Received \"" + dataVal + "\" from Client " + origin + ".");
 			break;
 		case 1: // receive
-			System.out.println("Received " + data[4] + " from " + data[2]);
+			location = origin;
+			userCount = dataVal;
+			System.out.println("Received userlist of " + userCount + " users, my location is " + location + ".");
+			RandomClient.location = origin;
+			RandomClient.target = getTarget(userCount);
 			break;
-		case 2: // userlist
-			location = data[3];
-			userCount = data[4];
+		default: // header not recognized
+			System.out.println("Received invalid packet " + dataVal + " from " + origin + ".");
 			break;
 		}
 	}
 	
-	public static void send (byte data)
-	{
-		sending = new byte[] {0, userTarget, location, data};
-	}
-	
-	public static byte sendTarget (byte users)
+	private byte getTarget (byte users)
 	{
 		Random random = new Random();
 		byte subject = (byte) random.nextInt(users);
-		return subject;
+		if (subject == location)
+		{
+			if (users > 0)
+			{
+				return -1;
+			}
+			else
+			{
+				return -1;
+			}
+		}
+		else
+		{
+			System.out.println("Targeted Client " + subject + ".");
+			return subject;
+		}
+	}
+}
+
+class SendThread extends Thread
+{
+	private byte[] sending;
+	private byte location;
+	private byte target;
+	private boolean send;
+	
+	public void run()
+	{
+		send = true;
+		update();
+		while (send)
+		{
+			Random random = new Random();
+			update();
+			try
+			{
+				if (target != -1)
+				{
+					send((byte) random.nextInt());
+				}
+				else
+				{
+					//System.out.println("No users to send data to.");
+				}
+				Thread.sleep(200);
+			}
+			catch (IOException | InterruptedException e)
+			{
+				e.printStackTrace();
+				System.exit(0);
+			}
+		}
+	}
+	
+	private void update ()
+	{
+		target = RandomClient.target;
+		location = RandomClient.location;
+	}
+	
+	private void send (byte data) throws IOException
+	{
+		sending = new byte[] {0, target, location, data};
+		System.out.println("Sending \"" + data + "\" to Client " + target);
+		RandomClient.socket.sendPacket(sending);
 	}
 }
