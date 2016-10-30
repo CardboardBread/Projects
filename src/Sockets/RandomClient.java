@@ -1,4 +1,4 @@
-package Sockets;
+package sockets;
 
 import java.io.IOException;
 import java.net.Socket;
@@ -66,7 +66,7 @@ class ReceiveThread extends Thread
 	private void receive (byte[] data)
 	{
 		byte packetType = data[0];
-		byte destination = data[1];
+		//byte destination = data[1];
 		byte origin = data[2];
 		byte dataVal = data[3];
 		
