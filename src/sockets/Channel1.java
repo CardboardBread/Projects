@@ -15,12 +15,12 @@ import java.util.Set;
 public class Channel1 {
 	public static final String ADDRESS = "localhost";
 	public static final int PORT = 6767;
-	public static final int clients = 50;
+	public static final int clients = 1;
 	
 	public static void main(String[] args) throws IOException, InterruptedException {
 		ServerChannel server = new ServerChannel(ADDRESS, PORT);
 		server.start();
-		for (int i = 0; i < clients; i++) {
+		for (int i = 1; i <= clients; i++) {
 			ClientChannel client = new ClientChannel(ADDRESS, PORT);
 			client.start();
 			Thread.sleep(100);
@@ -44,44 +44,36 @@ class ClientChannel extends Thread {
 	public void run () {
 		try {
 			client = SocketChannel.open();
+			client.configureBlocking(false);
 			client.connect(host);
-			System.out.println("Client connected to " + host);
+			
 			String threadName = Thread.currentThread().getName();
-			messages = new String[] {threadName + ": test1",threadName + ": test2",threadName + ": test3"};
+			
+			System.out.print(threadName + " connecting to " + host + "...");
+			while (!client.finishConnect()) {
+				System.out.print(".");
+			}
+			System.out.println(" Connected.");
+			
+			messages = new String[] {threadName + ": the ride never ends1",threadName + ": the ride never ends2",threadName + ": the ride never ends3"};
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
-		
-		try {
-			for (String str : messages) {
-				byte[] message = new String(str).getBytes();
-				ByteBuffer buffer = ByteBuffer.wrap(message);
-				client.write(buffer);
-				System.out.println(str);
-				buffer.clear();
-				Thread.sleep(5000);
-			}
-			client.close();
-		} catch (IOException | InterruptedException e) {
-			e.printStackTrace();
-		}
-	}
-	
-	public void send (String[] messages) {
-		sendHandler(messages, 1);
+		send(messages, 1);
 	}
 	
 	public void send (String[] messages, int delay) {
-		sendHandler(messages, delay);
-	}
-	
-	public void sendHandler (String[] messages, int delay) {
 		try {
 			for (String str : messages) {
-				byte[] byteMessage = new String(str).getBytes();
-				ByteBuffer buffer = ByteBuffer.wrap(byteMessage);
-				client.write(buffer);
+				ByteBuffer buffer = ByteBuffer.allocate(48);
 				buffer.clear();
+				buffer.put(str.getBytes());
+				
+				buffer.flip();
+				
+				while (buffer.hasRemaining()) {
+					client.write(buffer);
+				}
 				Thread.sleep(delay);
 			}
 		} catch (IOException | InterruptedException e) {
@@ -152,7 +144,7 @@ class ServerChannel extends Thread {
 		}
 	}
 	
-	public void read (SelectionKey key) throws IOException {
+	public byte[] read (SelectionKey key) throws IOException {
 		SocketChannel client = (SocketChannel) key.channel();
 		
 		readBuffer.clear();
@@ -171,11 +163,14 @@ class ServerChannel extends Thread {
 			System.out.println("Connection closed by client: " + remoteAddr);
 			client.close();
 			key.cancel();
-			return;
+			return null;
 		}
 		
 		byte[] data = new byte[totalBytesRead];
-		System.arraycopy(readBuffer, 0, data, 0, totalBytesRead);
-		System.out.println("Received " + new String(data));
+		for (int i = 0; i < totalBytesRead; i++) {
+			data[i] = readBuffer.get(i);
+		}
+		System.out.println("Received \"" + new String(data) + "\"");
+		return data;
 	}
 }
