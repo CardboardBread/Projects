@@ -15,7 +15,7 @@ import java.util.Set;
 public class Channel1 {
 	public static final String ADDRESS = "localhost";
 	public static final int PORT = 6767;
-	public static final int clients = 1;
+	public static final int clients = 100;
 	
 	public static void main(String[] args) throws IOException, InterruptedException {
 		ServerChannel server = new ServerChannel(ADDRESS, PORT);
@@ -23,7 +23,7 @@ public class Channel1 {
 		for (int i = 1; i <= clients; i++) {
 			ClientChannel client = new ClientChannel(ADDRESS, PORT);
 			client.start();
-			Thread.sleep(100);
+			Thread.sleep(1); // Delay before starting new client connection (protection for non-blocking clients)
 		}
 	}
 }
@@ -49,12 +49,14 @@ class ClientChannel extends Thread {
 			
 			String threadName = Thread.currentThread().getName();
 			
+			// if run from a client process, it will put trailing dots while it waits to connect
 			System.out.print(threadName + " connecting to " + host + "...");
 			while (!client.finishConnect()) {
 				System.out.print(".");
 			}
 			System.out.println(" Connected.");
 			
+			// sample string
 			messages = new String[] {threadName + ": the ride never ends1",threadName + ": the ride never ends2",threadName + ": the ride never ends3"};
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -71,9 +73,11 @@ class ClientChannel extends Thread {
 				
 				buffer.flip();
 				
+				// keeps writing until the buffer runs out of things to write
 				while (buffer.hasRemaining()) {
 					client.write(buffer);
 				}
+				// delay (cosmetic)
 				Thread.sleep(delay);
 			}
 		} catch (IOException | InterruptedException e) {
@@ -108,8 +112,10 @@ class ServerChannel extends Thread {
 	public void run () {
 		while (true) {
 			try {
+				// obtains all keys that are satisfied
 				selector.select();
 				
+				// creates an iterator to move through all the keys
 				Set<SelectionKey> selectedKeys = selector.selectedKeys();
 				Iterator<SelectionKey> keyIterator = selectedKeys.iterator();
 				
@@ -121,6 +127,8 @@ class ServerChannel extends Thread {
 					} else if (key.isReadable()) {
 						read(key);
 					}
+					
+					// removes key from iterator, so you dont hit it again
 					keyIterator.remove();
 				}
 			}
@@ -140,6 +148,7 @@ class ServerChannel extends Thread {
 			SocketAddress remoteAddr = socket.getRemoteSocketAddress();
 			System.out.println("Connected to: " +  remoteAddr);
 			
+			// registers the client a reading key
 			client.register(selector, SelectionKey.OP_READ);
 		}
 	}
@@ -152,11 +161,13 @@ class ServerChannel extends Thread {
 		int bytesRead = client.read(readBuffer);
 		int totalBytesRead = bytesRead;
 		
+		// attempts to read as many bytes as the buffer is holding
 		while (bytesRead > 0) {
 			bytesRead = client.read(readBuffer);
 			totalBytesRead += bytesRead;
 		}
 		
+		// when the read brings a -1, the user closed the connection, so we close the sockets and cancel the keys
 		if (bytesRead == -1) {
 			Socket socket = client.socket();
 			SocketAddress remoteAddr = socket.getRemoteSocketAddress();
@@ -166,6 +177,7 @@ class ServerChannel extends Thread {
 			return null;
 		}
 		
+		// copies the data from the buffer into a byte array
 		byte[] data = new byte[totalBytesRead];
 		for (int i = 0; i < totalBytesRead; i++) {
 			data[i] = readBuffer.get(i);
