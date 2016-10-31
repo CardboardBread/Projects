@@ -29,33 +29,19 @@ public class Channel1 {
 }
 
 class ClientChannel extends Thread {
-	private InetSocketAddress host;
 	private SocketChannel client;
 	private String messages;
 	private String threadName;
 	
-	public ClientChannel (String address, int port) {
-		try {
-			connect(new InetSocketAddress(address, port));
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
+	public ClientChannel (String address, int port) throws IOException {
+		connect(new InetSocketAddress(address, port));
 	}
 	
-	public ClientChannel (InetSocketAddress address) {
-		try {
-			connect(address);
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
+	public ClientChannel (InetSocketAddress address) throws IOException {
+		connect(address);
 	}
 	
 	public void run () {
-		try {
-			connect(host);
-		} catch (IOException e1) {
-			e1.printStackTrace();
-		}
 		messages = "therideneverends";
 		try {
 			write(messages.getBytes());
@@ -233,13 +219,11 @@ class ServerChannel extends Thread {
 		int bytesRead = client.read(buffer);
 		int totalBytesRead = bytesRead;
 		
-		// attempts to read as many bytes as the buffer is holding
 		while (bytesRead > 0) {
 			bytesRead = client.read(buffer);
 			totalBytesRead += bytesRead;
 		}
 		
-		// when the read brings a -1, the user closed the connection, so we close the sockets and cancel the keys
 		if (bytesRead == -1) {
 			Socket socket = client.socket();
 			SocketAddress remoteAddr = socket.getRemoteSocketAddress();
@@ -249,7 +233,6 @@ class ServerChannel extends Thread {
 			return null;
 		}
 		
-		// copies the data from the buffer into a byte array
 		byte[] data = new byte[totalBytesRead];
 		for (int i = 0; i < totalBytesRead; i++) {
 			data[i] = buffer.get(i);
