@@ -5,6 +5,7 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketAddress;
 import java.nio.ByteBuffer;
+import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
@@ -12,10 +13,10 @@ import java.nio.channels.SocketChannel;
 import java.util.Iterator;
 import java.util.Set;
 
-public class Channel1 {
+public class Channel2 {
 	public static final String ADDRESS = "localhost";
 	public static final int PORT = 6767;
-	public static final int clients = 100;
+	public static final int clients = 1;
 	
 	public static void main(String[] args) throws IOException, InterruptedException {
 		ServerChannel server = new ServerChannel(ADDRESS, PORT);
@@ -29,25 +30,62 @@ public class Channel1 {
 }
 
 class ClientChannel extends Thread {
+	private InetSocketAddress destination;
+	private Selector selector;
 	private SocketChannel client;
-	private String messages;
-	private String threadName;
+	private byte[] sending;
+	private byte[] received;
 	
 	public ClientChannel (String address, int port) throws IOException {
-		connect(new InetSocketAddress(address, port));
+		selector = Selector.open();
+		establish(new InetSocketAddress(address, port));
 	}
 	
 	public ClientChannel (InetSocketAddress address) throws IOException {
-		connect(address);
+		selector = Selector.open();
+		establish(address);
 	}
 	
 	public void run () {
-		messages = "therideneverends";
-		try {
-			write(messages.getBytes());
-		} catch (IOException e) {
-			e.printStackTrace();
+		while (true) {
+			try {
+				keyCheck();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
 		}
+	}
+	
+	public void keyCheck () throws IOException {
+		selector.select();
+		
+		Set<SelectionKey> selectedKeys = selector.selectedKeys();
+		Iterator<SelectionKey> keyIterator = selectedKeys.iterator();
+		
+		while (keyIterator.hasNext()) {
+			SelectionKey key = keyIterator.next();
+			
+			if (key.isAcceptable()) {
+				accept(key);
+			} else if (key.isConnectable()) {
+				connect(key);
+			} else if (key.isReadable()) {
+				received = read(key);
+			} else if (key.isWritable()) {
+				write(key);
+			}
+			keyIterator.remove();
+		}
+	}
+	
+	
+	
+	private void accept (SelectionKey key) {
+		
+	}
+	
+	public void candidate (Socket socket) {
+		
 	}
 	
 	/**
@@ -55,10 +93,9 @@ class ClientChannel extends Thread {
 	 * @param destination Where the client is to connect to.
 	 * @throws IOException 
 	 */
-	public void connect (InetSocketAddress destination) throws IOException {
-		threadName = Thread.currentThread().getName();
-		client = SocketChannel.open();
-		client.configureBlocking(false);
+	private void connect (SelectionKey key) throws IOException {
+		SocketChannel client = (SocketChannel) key.channel();
+		String threadName = Thread.currentThread().getName();
 		client.connect(destination);
 		
 		System.out.print(threadName + " connecting to " + destination + "...");
@@ -68,12 +105,20 @@ class ClientChannel extends Thread {
 		System.out.println(" Connected.");
 	}
 	
+	public void establish (InetSocketAddress address) throws IOException {
+		destination = address;
+		client = SocketChannel.open();
+		client.configureBlocking(false);
+		client.register(selector, SelectionKey.OP_CONNECT);
+	}
+	
 	/**
 	 * Continuously loads data into a byte buffer, then constructs a byte array of the buffer's data.
 	 * @return The data the function has read.
 	 * @throws IOException
 	 */
-	public byte[] read () throws IOException {
+	private byte[] read (SelectionKey key) throws IOException {
+		SocketChannel client = (SocketChannel) key.channel();
 		ByteBuffer buffer = ByteBuffer.allocate(48);
 		int bytesRead = client.read(buffer);
 		int totalBytesRead = bytesRead;
@@ -100,15 +145,24 @@ class ClientChannel extends Thread {
 	}
 	
 	/**
+	 * Public call to register client to receive data.
+	 * @throws ClosedChannelException 
+	 */
+	public void receive () throws ClosedChannelException {
+		client.register(selector, SelectionKey.OP_READ);
+	}
+	
+	/**
 	 * Sends a byte array to the connected server.
 	 * @param messages An array containing all the bytes the client wants to send.
 	 * @param delay The delay between each message being sent.
 	 * @throws IOException 
 	 */
-	public void write (byte[] data) throws IOException {
+	private void write (SelectionKey key) throws IOException {
+		SocketChannel client = (SocketChannel) key.channel();
 		ByteBuffer buffer = ByteBuffer.allocate(48);
 		buffer.clear();
-		buffer.put(data);
+		buffer.put(sending);
 		
 		buffer.flip();
 		
@@ -116,6 +170,18 @@ class ClientChannel extends Thread {
 			client.write(buffer);
 		}
 	}
+	
+	/**
+	 * Public call to register data for the client to send.
+	 * @param data The bytes to be registered for sending.
+	 * @throws ClosedChannelException
+	 */
+	public void send (byte[] data) throws ClosedChannelException {
+		sending = data;
+		client.register(selector, SelectionKey.OP_WRITE);
+	}
+	
+	
 	
 	/**
 	 * Closes the socket responsible for handling connections.
@@ -129,44 +195,43 @@ class ClientChannel extends Thread {
 class ServerChannel extends Thread {
 	private Selector selector;
 	private ServerSocketChannel server;
-	private InetSocketAddress bindAddress;
 	
 	public ServerChannel (String address, int port) throws IOException {
-		selector = Selector.open();
 		connect(new InetSocketAddress(address, port));
 	}
 	
 	public ServerChannel (InetSocketAddress source) throws IOException {
-		selector = Selector.open();
 		connect(source);
 	}
 	
 	public void run () {
 		while (true) {
 			try {
-				// obtains all keys that are satisfied
-				selector.select();
-				
-				// creates an iterator to move through all the keys
-				Set<SelectionKey> selectedKeys = selector.selectedKeys();
-				Iterator<SelectionKey> keyIterator = selectedKeys.iterator();
-				
-				while (keyIterator.hasNext()) {
-					SelectionKey key = keyIterator.next();
-					
-					if (key.isAcceptable()) {
-						accept(key);
-					} else if (key.isReadable()) {
-						read(key);
-					}
-					
-					// removes key from iterator, so you dont hit it again
-					keyIterator.remove();
-				}
+				keyCheck();
 			}
 			catch (IOException e) {
 				e.printStackTrace();
 			}
+		}
+	}
+	
+	public void keyCheck () throws IOException {
+		selector.select();
+		
+		Set<SelectionKey> selectedKeys = selector.selectedKeys();
+		Iterator<SelectionKey> keyIterator = selectedKeys.iterator();
+		
+		while (keyIterator.hasNext()) {
+			SelectionKey key = keyIterator.next();
+			
+			if (key.isAcceptable()) {
+				accept(key);
+			} else if (key.isReadable()) {
+				read(key);
+			} else if (key.isWritable()) {
+				
+			}
+			keyIterator.remove();
 		}
 	}
 	
@@ -195,6 +260,7 @@ class ServerChannel extends Thread {
 	 * @throws IOException
 	 */
 	public void connect (InetSocketAddress bind) throws IOException {
+		selector = Selector.open();
 		server = ServerSocketChannel.open();
 		server.configureBlocking(false);
 		
