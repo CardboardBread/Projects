@@ -31,44 +31,55 @@ public class Channel1 {
 class ClientChannel extends Thread {
 	private InetSocketAddress host;
 	private SocketChannel client;
-	private String[] messages;
+	private String messages;
 	private String threadName;
 	
 	public ClientChannel (String address, int port) {
-		host = new InetSocketAddress(address, port);
+		try {
+			connect(new InetSocketAddress(address, port));
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
 	}
 	
 	public ClientChannel (InetSocketAddress address) {
-		host = address;
+		try {
+			connect(address);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
 	}
 	
 	public void run () {
-		connect(host);
-		messages = new String[] {threadName + ": the ride never ends1",threadName + ": the ride never ends2",threadName + ": the ride never ends3"};
-		write(messages, 1);
+		try {
+			connect(host);
+		} catch (IOException e1) {
+			e1.printStackTrace();
+		}
+		messages = "therideneverends";
+		try {
+			write(messages.getBytes());
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
 	}
 	
 	/**
 	 * Attempts to connect to the provided address, giving the user real time feedback on how long its taking to connect.
 	 * @param destination Where the client is to connect to.
+	 * @throws IOException 
 	 */
-	public void connect (InetSocketAddress destination) {
-		try {
-			threadName = Thread.currentThread().getName();
-			client = SocketChannel.open();
-			client.configureBlocking(false);
-			client.connect(destination);
-			
-			System.out.print(threadName + " connecting to " + destination + "...");
-			while (!client.finishConnect()) {
-				System.out.print(".");
-			}
-			System.out.println(" Connected.");
+	public void connect (InetSocketAddress destination) throws IOException {
+		threadName = Thread.currentThread().getName();
+		client = SocketChannel.open();
+		client.configureBlocking(false);
+		client.connect(destination);
+		
+		System.out.print(threadName + " connecting to " + destination + "...");
+		while (!client.finishConnect()) {
+			System.out.print(".");
 		}
-		catch (IOException e) {
-			System.out.println("Failed to connect to " + destination);
-			e.printStackTrace();
-		}
+		System.out.println(" Connected.");
 	}
 	
 	/**
@@ -100,30 +111,23 @@ class ClientChannel extends Thread {
 		}
 		System.out.println("Received \"" + new String(data) + "\"");
 		return data;
-			
 	}
 	
 	/**
-	 * Sends multiple strings to the connected server.
-	 * @param messages An array containing all the messages the client wants to send.
+	 * Sends a byte array to the connected server.
+	 * @param messages An array containing all the bytes the client wants to send.
 	 * @param delay The delay between each message being sent.
+	 * @throws IOException 
 	 */
-	public void write (String[] messages, int delay) {
-		try {
-			for (String str : messages) {
-				ByteBuffer buffer = ByteBuffer.allocate(48);
-				buffer.clear();
-				buffer.put(str.getBytes());
-				
-				buffer.flip();
-				
-				while (buffer.hasRemaining()) {
-					client.write(buffer);
-				}
-				Thread.sleep(delay);
-			}
-		} catch (IOException | InterruptedException e) {
-			e.printStackTrace();
+	public void write (byte[] data) throws IOException {
+		ByteBuffer buffer = ByteBuffer.allocate(48);
+		buffer.clear();
+		buffer.put(data);
+		
+		buffer.flip();
+		
+		while (buffer.hasRemaining()) {
+			client.write(buffer);
 		}
 	}
 	
@@ -139,19 +143,16 @@ class ClientChannel extends Thread {
 class ServerChannel extends Thread {
 	private Selector selector;
 	private ServerSocketChannel server;
-	private InetSocketAddress hostAddress;
+	private InetSocketAddress bindAddress;
 	
 	public ServerChannel (String address, int port) throws IOException {
 		selector = Selector.open();
-		
-		server = ServerSocketChannel.open();
-		server.configureBlocking(false);
-		
-		hostAddress = new InetSocketAddress(address, port);
-		server.socket().bind(hostAddress);
-		System.out.println("Server started on: " +  hostAddress);
-		
-		server.register(selector, SelectionKey.OP_ACCEPT);
+		connect(new InetSocketAddress(address, port));
+	}
+	
+	public ServerChannel (InetSocketAddress source) throws IOException {
+		selector = Selector.open();
+		connect(source);
 	}
 	
 	public void run () {
@@ -183,6 +184,11 @@ class ServerChannel extends Thread {
 		}
 	}
 	
+	/**
+	 * Handles the provided key, which contains an accept flag, registering the client's socket in the selector.
+	 * @param key The accept flagged key.
+	 * @throws IOException
+	 */
 	public void accept (SelectionKey key) throws IOException {
 		ServerSocketChannel server = (ServerSocketChannel) key.channel();
 		SocketChannel client = server.accept();
@@ -193,11 +199,31 @@ class ServerChannel extends Thread {
 			SocketAddress remoteAddr = socket.getRemoteSocketAddress();
 			System.out.println("Connected to: " +  remoteAddr);
 			
-			// registers the client a reading key
 			client.register(selector, SelectionKey.OP_READ);
 		}
 	}
 	
+	/**
+	 * Starts and binds the server onto the provided address, once that is completed, the server will be registered with the selector.
+	 * @param bind The address the server wants to bind to.
+	 * @throws IOException
+	 */
+	public void connect (InetSocketAddress bind) throws IOException {
+		server = ServerSocketChannel.open();
+		server.configureBlocking(false);
+		
+		server.socket().bind(bind);
+		System.out.println("Server started on: " +  bind);
+		
+		server.register(selector, SelectionKey.OP_ACCEPT);
+	}
+	
+	/**
+	 * 
+	 * @param key
+	 * @return
+	 * @throws IOException
+	 */
 	public byte[] read (SelectionKey key) throws IOException {
 		SocketChannel client = (SocketChannel) key.channel();
 		ByteBuffer buffer = ByteBuffer.allocate(48);
@@ -230,5 +256,9 @@ class ServerChannel extends Thread {
 		}
 		System.out.println("Received \"" + new String(data) + "\"");
 		return data;
+	}
+	
+	public void write () {
+		
 	}
 }
