@@ -32,6 +32,7 @@ class ClientChannel extends Thread {
 	private InetSocketAddress host;
 	private SocketChannel client;
 	private String[] messages;
+	private String threadName;
 	
 	public ClientChannel (String address, int port) {
 		host = new InetSocketAddress(address, port);
@@ -42,29 +43,72 @@ class ClientChannel extends Thread {
 	}
 	
 	public void run () {
+		connect(host);
+		messages = new String[] {threadName + ": the ride never ends1",threadName + ": the ride never ends2",threadName + ": the ride never ends3"};
+		write(messages, 1);
+	}
+	
+	/**
+	 * Attempts to connect to the provided address, giving the user real time feedback on how long its taking to connect.
+	 * @param destination Where the client is to connect to.
+	 */
+	public void connect (InetSocketAddress destination) {
 		try {
+			threadName = Thread.currentThread().getName();
 			client = SocketChannel.open();
 			client.configureBlocking(false);
-			client.connect(host);
+			client.connect(destination);
 			
-			String threadName = Thread.currentThread().getName();
-			
-			// if run from a client process, it will put trailing dots while it waits to connect
-			System.out.print(threadName + " connecting to " + host + "...");
+			System.out.print(threadName + " connecting to " + destination + "...");
 			while (!client.finishConnect()) {
 				System.out.print(".");
 			}
 			System.out.println(" Connected.");
-			
-			// sample string
-			messages = new String[] {threadName + ": the ride never ends1",threadName + ": the ride never ends2",threadName + ": the ride never ends3"};
-		} catch (IOException e) {
+		}
+		catch (IOException e) {
+			System.out.println("Failed to connect to " + destination);
 			e.printStackTrace();
 		}
-		send(messages, 1);
 	}
 	
-	public void send (String[] messages, int delay) {
+	/**
+	 * Continuously loads data into a byte buffer, then constructs a byte array of the buffer's data.
+	 * @return The data the function has read.
+	 * @throws IOException
+	 */
+	public byte[] read () throws IOException {
+		ByteBuffer buffer = ByteBuffer.allocate(48);
+		int bytesRead = client.read(buffer);
+		int totalBytesRead = bytesRead;
+		
+		while (bytesRead > 0) {
+			bytesRead =  client.read(buffer);
+			totalBytesRead += bytesRead;
+		}
+		
+		if (bytesRead == -1) {
+			Socket socket = client.socket();
+			SocketAddress remoteAddr = socket.getRemoteSocketAddress();
+			System.out.println("Connection closed by server: " + remoteAddr);
+			client.close();
+			return null;
+		}
+		
+		byte[] data = new byte[totalBytesRead];
+		for (int i = 0; i < totalBytesRead; i++) {
+			data[i] = buffer.get(i);
+		}
+		System.out.println("Received \"" + new String(data) + "\"");
+		return data;
+			
+	}
+	
+	/**
+	 * Sends multiple strings to the connected server.
+	 * @param messages An array containing all the messages the client wants to send.
+	 * @param delay The delay between each message being sent.
+	 */
+	public void write (String[] messages, int delay) {
 		try {
 			for (String str : messages) {
 				ByteBuffer buffer = ByteBuffer.allocate(48);
@@ -73,11 +117,9 @@ class ClientChannel extends Thread {
 				
 				buffer.flip();
 				
-				// keeps writing until the buffer runs out of things to write
 				while (buffer.hasRemaining()) {
 					client.write(buffer);
 				}
-				// delay (cosmetic)
 				Thread.sleep(delay);
 			}
 		} catch (IOException | InterruptedException e) {
@@ -85,6 +127,10 @@ class ClientChannel extends Thread {
 		}
 	}
 	
+	/**
+	 * Closes the socket responsible for handling connections.
+	 * @throws IOException
+	 */
 	public void disconnect () throws IOException {
 		client.close();
 	}
@@ -94,7 +140,6 @@ class ServerChannel extends Thread {
 	private Selector selector;
 	private ServerSocketChannel server;
 	private InetSocketAddress hostAddress;
-	private ByteBuffer readBuffer = ByteBuffer.allocate(48);
 	
 	public ServerChannel (String address, int port) throws IOException {
 		selector = Selector.open();
@@ -155,15 +200,16 @@ class ServerChannel extends Thread {
 	
 	public byte[] read (SelectionKey key) throws IOException {
 		SocketChannel client = (SocketChannel) key.channel();
+		ByteBuffer buffer = ByteBuffer.allocate(48);
 		
-		readBuffer.clear();
+		buffer.clear();
 		
-		int bytesRead = client.read(readBuffer);
+		int bytesRead = client.read(buffer);
 		int totalBytesRead = bytesRead;
 		
 		// attempts to read as many bytes as the buffer is holding
 		while (bytesRead > 0) {
-			bytesRead = client.read(readBuffer);
+			bytesRead = client.read(buffer);
 			totalBytesRead += bytesRead;
 		}
 		
@@ -180,7 +226,7 @@ class ServerChannel extends Thread {
 		// copies the data from the buffer into a byte array
 		byte[] data = new byte[totalBytesRead];
 		for (int i = 0; i < totalBytesRead; i++) {
-			data[i] = readBuffer.get(i);
+			data[i] = buffer.get(i);
 		}
 		System.out.println("Received \"" + new String(data) + "\"");
 		return data;
