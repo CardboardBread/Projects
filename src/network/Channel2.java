@@ -17,33 +17,35 @@ public class Channel2 {
 	public static final String ADDRESS = "localhost";
 	public static final int PORT = 6767;
 	public static final int clients = 1;
+	public static final TCPSocketChannelType Client = TCPSocketChannelType.Client;
+	public static final TCPSocketChannelType Server = TCPSocketChannelType.Server;
 	
 	public static void main(String[] args) throws IOException, InterruptedException {
-		ServerChannel server = new ServerChannel(ADDRESS, PORT);
+		TCPSocketChannel server = new TCPSocketChannel(ADDRESS, PORT, Server);
 		server.start();
 		for (int i = 1; i <= clients; i++) {
-			ClientChannel client = new ClientChannel(ADDRESS, PORT);
+			TCPSocketChannel client = new TCPSocketChannel(ADDRESS, PORT, Client);
 			client.start();
 			Thread.sleep(1); // Delay before starting new client connection (protection for non-blocking clients)
 		}
 	}
 }
 
-class ClientChannel extends Thread {
-	private InetSocketAddress destination;
+class TCPSocketChannel extends Thread {
+	private int bufferSize = 48;
 	private Selector selector;
+	private ServerSocketChannel server;
 	private SocketChannel client;
 	private byte[] sending;
 	private byte[] received;
 	
-	public ClientChannel (String address, int port) throws IOException {
+	public TCPSocketChannel (String address, int port, TCPSocketChannelType function) throws IOException {
 		selector = Selector.open();
-		establish(new InetSocketAddress(address, port));
-	}
-	
-	public ClientChannel (InetSocketAddress address) throws IOException {
-		selector = Selector.open();
-		establish(address);
+		if (function == TCPSocketChannelType.Server) {
+			host(new InetSocketAddress(address, port));
+		} else {
+			connect(new InetSocketAddress(address, port));
+		}
 	}
 	
 	public void run () {
@@ -68,7 +70,7 @@ class ClientChannel extends Thread {
 			if (key.isAcceptable()) {
 				accept(key);
 			} else if (key.isConnectable()) {
-				connect(key);
+				welcome(key);
 			} else if (key.isReadable()) {
 				received = read(key);
 			} else if (key.isWritable()) {
@@ -78,48 +80,77 @@ class ClientChannel extends Thread {
 		}
 	}
 	
-	
-	
-	private void accept (SelectionKey key) {
-		
+	private void accept (SelectionKey key) throws IOException {
+		ServerSocketChannel server = (ServerSocketChannel) key.channel();
+		SocketChannel client = server.accept();
+		if (client != null) {
+			client.configureBlocking(false);
+			
+			Socket socket = client.socket();
+			SocketAddress remoteAddr = socket.getRemoteSocketAddress();
+			System.out.println("Accepted connection from: " +  remoteAddr);
+			
+			client.register(selector, SelectionKey.OP_READ);
+		}
 	}
 	
-	public void candidate (Socket socket) {
+	public void candidate (SocketChannel socket) throws IOException {
 		
 	}
 	
 	/**
-	 * Attempts to connect to the provided address, giving the user real time feedback on how long its taking to connect.
-	 * @param destination Where the client is to connect to.
-	 * @throws IOException 
+	 * Creates a server bound to the provided address, then registers the server to accept connections.
+	 * @param address The location the server will bind to.
+	 * @throws IOException
 	 */
-	private void connect (SelectionKey key) throws IOException {
-		SocketChannel client = (SocketChannel) key.channel();
-		String threadName = Thread.currentThread().getName();
-		client.connect(destination);
+	private void host (InetSocketAddress address) throws IOException {
+		server = ServerSocketChannel.open();
+		server.configureBlocking(false);
 		
-		System.out.print(threadName + " connecting to " + destination + "...");
+		server.bind(address);
+		System.out.println("Server started on: " + address);
+		
+		server.register(selector, SelectionKey.OP_ACCEPT);
+	}
+	
+	/**
+	 * Attempts to connect to the provided address as a client, giving the user real time feedback on how long its taking to connect.
+	 * A connection registration will also be made, in the event that the connection succeeds.
+	 * @param address The location the client is to connect to.
+	 * @throws IOException
+	 */
+	public void connect (InetSocketAddress address) throws IOException {
+		client = SocketChannel.open();
+		client.configureBlocking(false);
+		client.connect(address);
+		
+		String threadName = Thread.currentThread().getName();
+		System.out.print(threadName + " connecting to " + address + "...");
 		while (!client.finishConnect()) {
 			System.out.print(".");
 		}
 		System.out.println(" Connected.");
-	}
-	
-	public void establish (InetSocketAddress address) throws IOException {
-		destination = address;
-		client = SocketChannel.open();
-		client.configureBlocking(false);
 		client.register(selector, SelectionKey.OP_CONNECT);
 	}
 	
 	/**
-	 * Continuously loads data into a byte buffer, then constructs a byte array of the buffer's data.
-	 * @return The data the function has read.
+	 * Public call to be made once a connection has succeeded.
+	 * @throws ClosedChannelException 
+	 */
+	public void welcome (SelectionKey key) throws ClosedChannelException {
+		SocketChannel client = (SocketChannel) key.channel();
+		send(client.toString().getBytes());
+	}
+	
+	/**
+	 * Identifies, then writes data sent from a client into a byte array.
+	 * @param key The identifier for the client sending data.
+	 * @return All data read from the client.
 	 * @throws IOException
 	 */
 	private byte[] read (SelectionKey key) throws IOException {
 		SocketChannel client = (SocketChannel) key.channel();
-		ByteBuffer buffer = ByteBuffer.allocate(48);
+		ByteBuffer buffer = ByteBuffer.allocate(bufferSize);
 		int bytesRead = client.read(buffer);
 		int totalBytesRead = bytesRead;
 		
@@ -131,7 +162,7 @@ class ClientChannel extends Thread {
 		if (bytesRead == -1) {
 			Socket socket = client.socket();
 			SocketAddress remoteAddr = socket.getRemoteSocketAddress();
-			System.out.println("Connection closed by server: " + remoteAddr);
+			System.out.println("Connection closed by: " + remoteAddr);
 			client.close();
 			return null;
 		}
@@ -145,7 +176,7 @@ class ClientChannel extends Thread {
 	}
 	
 	/**
-	 * Public call to register client to receive data.
+	 * Public call to register data to be read from any client.
 	 * @throws ClosedChannelException 
 	 */
 	public void receive () throws ClosedChannelException {
@@ -153,14 +184,13 @@ class ClientChannel extends Thread {
 	}
 	
 	/**
-	 * Sends a byte array to the connected server.
-	 * @param messages An array containing all the bytes the client wants to send.
-	 * @param delay The delay between each message being sent.
-	 * @throws IOException 
+	 * Identifies a client's socket, and sends data created from the send method.
+	 * @param key The identifier responsible for sending the right data to the right client.
+	 * @throws IOException
 	 */
 	private void write (SelectionKey key) throws IOException {
 		SocketChannel client = (SocketChannel) key.channel();
-		ByteBuffer buffer = ByteBuffer.allocate(48);
+		ByteBuffer buffer = ByteBuffer.allocate(bufferSize);
 		buffer.clear();
 		buffer.put(sending);
 		
@@ -172,16 +202,14 @@ class ClientChannel extends Thread {
 	}
 	
 	/**
-	 * Public call to register data for the client to send.
-	 * @param data The bytes to be registered for sending.
+	 * Public call to register data to sent.
+	 * @param data The byte array to be registered for sending.
 	 * @throws ClosedChannelException
 	 */
 	public void send (byte[] data) throws ClosedChannelException {
 		sending = data;
 		client.register(selector, SelectionKey.OP_WRITE);
 	}
-	
-	
 	
 	/**
 	 * Closes the socket responsible for handling connections.
@@ -248,7 +276,7 @@ class ServerChannel extends Thread {
 			
 			Socket socket = client.socket();
 			SocketAddress remoteAddr = socket.getRemoteSocketAddress();
-			System.out.println("Connected to: " +  remoteAddr);
+			System.out.println("Accepted connection from: " +  remoteAddr);
 			
 			client.register(selector, SelectionKey.OP_READ);
 		}
