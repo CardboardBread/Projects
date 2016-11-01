@@ -11,7 +11,6 @@ import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.Iterator;
-import java.util.Scanner;
 import java.util.Set;
 
 public class Channel2 {
@@ -38,6 +37,7 @@ class TCPSocketChannel extends Thread {
 	private ServerSocketChannel server;
 	private SocketChannel client;
 	private byte[] sending;
+	@SuppressWarnings("unused")
 	private byte[] received;
 	
 	public TCPSocketChannel (String address, int port, TCPSocketChannelType function) throws IOException {
