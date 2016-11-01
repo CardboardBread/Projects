@@ -11,15 +11,15 @@ import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.Iterator;
+import java.util.Scanner;
 import java.util.Set;
 
 public class Channel2 {
 	public static final String ADDRESS = "localhost";
 	public static final int PORT = 6767;
-	public static final int clients = 1;
+	public static final int clients = 700;
 	public static final TCPSocketChannelType Client = TCPSocketChannelType.Client;
 	public static final TCPSocketChannelType Server = TCPSocketChannelType.Server;
-	
 	public static void main(String[] args) throws IOException, InterruptedException {
 		TCPSocketChannel server = new TCPSocketChannel(ADDRESS, PORT, Server);
 		server.start();
@@ -34,12 +34,14 @@ public class Channel2 {
 class TCPSocketChannel extends Thread {
 	private int bufferSize = 48;
 	private Selector selector;
+	private TCPSocketChannelType function;
 	private ServerSocketChannel server;
 	private SocketChannel client;
 	private byte[] sending;
 	private byte[] received;
 	
 	public TCPSocketChannel (String address, int port, TCPSocketChannelType function) throws IOException {
+		this.function = function;
 		selector = Selector.open();
 		if (function == TCPSocketChannelType.Server) {
 			host(new InetSocketAddress(address, port));
@@ -52,9 +54,11 @@ class TCPSocketChannel extends Thread {
 		while (true) {
 			try {
 				keyCheck();
-			} catch (IOException e) {
+				Thread.sleep(10);
+			} catch (IOException | InterruptedException e) {
 				e.printStackTrace();
 			}
+			
 		}
 	}
 	
@@ -106,8 +110,8 @@ class TCPSocketChannel extends Thread {
 	private void host (InetSocketAddress address) throws IOException {
 		server = ServerSocketChannel.open();
 		server.configureBlocking(false);
-		
 		server.bind(address);
+		
 		System.out.println("Server started on: " + address);
 		
 		server.register(selector, SelectionKey.OP_ACCEPT);
@@ -180,7 +184,11 @@ class TCPSocketChannel extends Thread {
 	 * @throws ClosedChannelException 
 	 */
 	public void receive () throws ClosedChannelException {
-		client.register(selector, SelectionKey.OP_READ);
+		if (function == TCPSocketChannelType.Client) {
+			client.register(selector, SelectionKey.OP_READ);
+		} else {
+			server.register(selector, SelectionKey.OP_READ);
+		}
 	}
 	
 	/**
@@ -208,7 +216,12 @@ class TCPSocketChannel extends Thread {
 	 */
 	public void send (byte[] data) throws ClosedChannelException {
 		sending = data;
-		client.register(selector, SelectionKey.OP_WRITE);
+		if (function == TCPSocketChannelType.Client) {
+			client.register(selector, SelectionKey.OP_WRITE);
+		} else {
+			server.register(selector, SelectionKey.OP_WRITE);
+		}
+		
 	}
 	
 	/**
@@ -216,6 +229,7 @@ class TCPSocketChannel extends Thread {
 	 * @throws IOException
 	 */
 	public void disconnect () throws IOException {
+		server.close();
 		client.close();
 	}
 }
