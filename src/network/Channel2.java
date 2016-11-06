@@ -40,6 +40,14 @@ class TCPSocketChannel extends Thread {
 	@SuppressWarnings("unused")
 	private byte[] received;
 	
+	
+	/**
+	 * Constructor method responsible for initializing the function and Inet location of the thread.
+	 * @param address String responsible for the universal destination/source of the client/server.
+	 * @param port The port the client will connect to, or the server will host on.
+	 * @param function Enum type identifying whether the thread is acting as a client or server.
+	 * @throws IOException
+	 */
 	public TCPSocketChannel (String address, int port, TCPSocketChannelType function) throws IOException {
 		this.function = function;
 		selector = Selector.open();
@@ -50,6 +58,9 @@ class TCPSocketChannel extends Thread {
 		}
 	}
 	
+	/**
+	 * Thread extended method responsible for consistently checking for satisfied keys.
+	 */
 	public void run () {
 		while (true) {
 			try {
@@ -62,6 +73,10 @@ class TCPSocketChannel extends Thread {
 		}
 	}
 	
+	/**
+	 * Selects and then iterates through all keys that have at least one of their 4 flags satisfied.
+	 * @throws IOException
+	 */
 	public void keyCheck () throws IOException {
 		selector.select();
 		
@@ -84,6 +99,11 @@ class TCPSocketChannel extends Thread {
 		}
 	}
 	
+	/**
+	 * Key handler for when the server has a client attempting to connect to it.
+	 * @param key The key bound to the server registered for accepting connections.
+	 * @throws IOException
+	 */
 	private void accept (SelectionKey key) throws IOException {
 		ServerSocketChannel server = (ServerSocketChannel) key.channel();
 		SocketChannel client = server.accept();
@@ -98,6 +118,11 @@ class TCPSocketChannel extends Thread {
 		}
 	}
 	
+	/**
+	 * Public call supposed to tie into registering an object to satisfy key.isConnectable.
+	 * @param socket
+	 * @throws IOException
+	 */
 	public void candidate (SocketChannel socket) throws IOException {
 		
 	}
@@ -138,7 +163,7 @@ class TCPSocketChannel extends Thread {
 	}
 	
 	/**
-	 * Public call to be made once a connection has succeeded.
+	 * Public call to be made once a connection has succeeded. //TODO: Supposed to be called when a key isConnectable, does not trigger
 	 * @throws ClosedChannelException 
 	 */
 	public void welcome (SelectionKey key) throws ClosedChannelException {
