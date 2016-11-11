@@ -1,11 +1,12 @@
 package dicegame;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Random;
 
 public class DiceGame {
 	
-	public static final int SAMPLE_SIZE = 100;
+	public static final int SAMPLE_SIZE = 1000;
 	public static final int TRIALS = 10000;
 	public static final int ROUNDS = 8;
 	
@@ -37,6 +38,8 @@ public class DiceGame {
 		int ties = 0;
 		int[] aWinsTotal = new int[trialCount];
 		int[] bWinsTotal = new int[trialCount];
+		String[][] aStrat = new String[trialCount][rounds];
+		String[][] bStrat = new String[trialCount][rounds];
 		
 		for (int i = 0; i < trialCount; i++) {
 			//System.out.println("Trial " + (i + 1));
@@ -45,10 +48,14 @@ public class DiceGame {
 			
 			ArrayList<String> playerA = new ArrayList<String>(Arrays.asList("A", "A", "B", "B", "C", "C", "D", "D"));
 			ArrayList<String> playerB = new ArrayList<String>(Arrays.asList("A", "A", "B", "B", "C", "C", "D", "D"));
+			Collections.shuffle(playerA);
+			Collections.shuffle(playerB);
 			
 			for (int k = 0; k < rounds; k++) {
 				int aRoll = rollDie(playerA.get(k));
 				int bRoll = rollDie(playerB.get(k));
+				aStrat[i][k] = playerA.get(k);
+				bStrat[i][k] = playerB.get(k);
 				//System.out.println("A rolled " + aRoll + " and B rolled " + bRoll);
 				if (aRoll > bRoll) {
 					//System.out.println("A wins!");
@@ -76,17 +83,18 @@ public class DiceGame {
 		//System.out.println("A won " + aWins + " trials");
 		//System.out.println("B won " + bWins + " trials");
 		//System.out.println("They tied in " + ties + " trials");
-		
+		String winner;
 		if (aWins > bWins) {
-			System.out.println("A won over " + trialCount + ", " + rounds + " round trials with a " + (aWins - bWins) + " trial lead");
-			return new TrialResult(aWins,bWins,ties,"A",aWinsTotal,bWinsTotal);
+			System.out.println("A won over " + trialCount + " " + rounds + "-round trials with a " + (aWins - bWins) + " trial lead");
+			winner = "A";
 		} else if (bWins > aWins) {
-			System.out.println("B won over " + trialCount + ", " + rounds + " round trials with a " + (bWins - aWins) + " trial lead");
-			return new TrialResult(aWins,bWins,ties,"B",aWinsTotal,bWinsTotal);
+			System.out.println("B won over " + trialCount + " " + rounds + "-round trials with a " + (bWins - aWins) + " trial lead");
+			winner = "B";
 		} else {
-			System.out.println("Both players tied over " + trialCount + ", " + rounds + " round trials");
-			return new TrialResult(aWins,bWins,ties,"T",aWinsTotal,bWinsTotal);
+			System.out.println("Both players tied over " + trialCount + " " + rounds + "-round trials");
+			winner = "T";
 		}
+		return new TrialResult(aWins,bWins,ties,winner,aWinsTotal,bWinsTotal,aStrat,bStrat);
 	}
 
 	public static void main(String[] args) {
