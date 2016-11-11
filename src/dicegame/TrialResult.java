@@ -1,3 +1,4 @@
+package dicegame;
 
 public class TrialResult {
 

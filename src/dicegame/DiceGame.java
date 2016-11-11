@@ -1,3 +1,4 @@
+package dicegame;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Random;
@@ -8,16 +9,12 @@ public class DiceGame {
 	public static final int TRIALS = 10000;
 	public static final int ROUNDS = 8;
 	
-	public static int[] DiceA = {7,7,7,7,1,1};
-	public static int[] DiceB = {5,5,5,5,5,5};
-	public static int[] DiceC = {9,9,3,3,3,3};
-	public static int[] DiceD = {8,8,8,2,2,2};
+	public static final int[] DiceA = {7,7,7,7,1,1};
+	public static final int[] DiceB = {5,5,5,5,5,5};
+	public static final int[] DiceC = {9,9,3,3,3,3};
+	public static final int[] DiceD = {8,8,8,2,2,2};
 	
 	public static ArrayList<TrialResult> results;
-	public static int aWins;
-	public static int bWins;
-	public static int ties;
-	
 	
 	public static int rollDie (String die) {
 		Random rand = new Random();
