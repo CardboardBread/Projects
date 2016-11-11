@@ -85,16 +85,32 @@ public class DiceGame {
 		//System.out.println("They tied in " + ties + " trials");
 		String winner;
 		if (aWins > bWins) {
-			System.out.println("A won over " + trialCount + " " + rounds + "-round trials with a " + (aWins - bWins) + " trial lead");
+			//System.out.println("A won over " + trialCount + " " + rounds + "-round trials with a " + (aWins - bWins) + " trial lead");
 			winner = "A";
 		} else if (bWins > aWins) {
-			System.out.println("B won over " + trialCount + " " + rounds + "-round trials with a " + (bWins - aWins) + " trial lead");
+			//System.out.println("B won over " + trialCount + " " + rounds + "-round trials with a " + (bWins - aWins) + " trial lead");
 			winner = "B";
 		} else {
-			System.out.println("Both players tied over " + trialCount + " " + rounds + "-round trials");
+			//System.out.println("Both players tied over " + trialCount + " " + rounds + "-round trials");
 			winner = "T";
 		}
 		return new TrialResult(aWins,bWins,ties,winner,aWinsTotal,bWinsTotal,aStrat,bStrat);
+	}
+	
+	public static void sampleCollector (ArrayList<TrialResult> subject) {
+		int aWins = 0;
+		int bWins = 0;
+		int ties = 0;
+		for (TrialResult result : subject) {
+			if (result.getWinner() == "A") {
+				aWins++;
+			} else if (result.getWinner() == "B") {
+				bWins++;
+			} else if (result.getWinner() == "T") {
+				ties++;
+			}
+		}
+		System.out.println("A won " + aWins + " samples, B won " + bWins + " samples, tying " + ties + " times");
 	}
 
 	public static void main(String[] args) {
@@ -102,6 +118,7 @@ public class DiceGame {
 		for (int i = 0; i < SAMPLE_SIZE; i++) {
 			results.add(trial(TRIALS, ROUNDS));
 		}
+		sampleCollector(results);
 	}
 
 }
