@@ -1,17 +1,38 @@
-
+/**
+ * Stores integers in a single String, splitting and reforming it when edits are made.
+ * Uses a signature escape character to properly split the string into a usable array.
+ * Since the string needs to be initialized empty, the empty character is seen as an initial entry into the string.
+ * @author mike_
+ * Finished November 3rd, 2016
+ */
 public class StringStore {
-	public static final String escape = "-";
+	public static String escape = "-";
 	public static String data;
 	
-	public StringStore() {
+	/**
+	 * constructor method, initializing the storage variable and setting the escape string.
+	 * @param esc The character(s) used to indicate the space between variables.
+	 */
+	public StringStore(String esc) {
+		escape = esc;
 		data = new String();
 	}
 	
+	/**
+	 * Returns the data stored at the following index.
+	 * @param index The location of the desired data.
+	 * @return
+	 */
 	public String get (int index) {
 		String[] split = data.split(escape);
 		return split[index];
 	}
 	
+	/**
+	 * Adds the input onto the end of the string.
+	 * @param content The data to be added.
+	 * @return
+	 */
 	public boolean append (int content) {
 		try {
 			String[] split = data.split(escape);
@@ -26,6 +47,12 @@ public class StringStore {
 		}
 	}
 	
+	/**
+	 * Replaces the following index with the provided data.
+	 * @param index The location of the data to replace.
+	 * @param content The data that will take the place of the indexed data.
+	 * @return
+	 */
 	public boolean replace (int index, int content) {
 		try {
 			String[] split = data.split(escape);
@@ -36,6 +63,12 @@ public class StringStore {
 		}
 	}
 	
+	/**
+	 * Removes the provided data from the string, without removing the space the data was contained in.
+	 * This results in empty spaces.
+	 * @param index
+	 * @return
+	 */
 	public boolean remove (int index) {
 		try {
 			String[] split = data.split(escape);

@@ -1,14 +1,14 @@
-import java.util.Random;
 
 public class StringTest {
 	public static void main(String[] args) {
-		Random random = new Random();
-		StringStore str = new StringStore();
+		StringStore2 str = new StringStore2();
 		
-		for (int i = 0; i < 100; i++) {
-			str.append(Math.abs(random.nextInt()));
-		}
-		str.remove(2);
+		str.append("hey");
+		str.append("goon");
+		str.append("giant");
+		str.append("trouble");
+		str.display();
+		str.remove(0);
 		str.display();
 	}
 }
