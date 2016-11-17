@@ -11,10 +11,8 @@ public class StringStore {
 	
 	/**
 	 * constructor method, initializing the storage variable and setting the escape string.
-	 * @param esc The character(s) used to indicate the space between variables.
 	 */
-	public StringStore(String esc) {
-		escape = esc;
+	public StringStore() {
 		data = new String();
 	}
 	
