@@ -14,20 +14,17 @@
 
 #define maximumRange 200 // highest acceptible distance from the ultrasonic sensor
 #define minimumRange 0 // lowest acceptible distance from the ultrasonic sensor
-#define stepDistance 50 // millisecond pause between each step performed
+#define stepDelay 50 // millisecond pause between each step performed
 #define zeroAdjust 2 // Maximum amount of variation from zero distance allowed
 #define zeroConfidence 10 // # of measurements made when zeroing distance from wall
-#define maxDelta 1.25 // largest amount of change between measurements
+#define maxDelta 1 // largest amount of change between measurements
+#define minDelta 0.25 // lowest amount of change between measurements
 #define serialSpeed 9600 // Arduino communication speed
 
 int minThreshold;
 int maxThreshold;
-int stepCount = 0;
-float duration;
-float distance;
 float lastDistance;
 boolean state = true;
-const boolean debug = true;
 
 void setup() { // Begin serial transmission, initialize all pins, set zero distance, wait for start button
   pinMode(trigPin, OUTPUT);
@@ -46,13 +43,18 @@ void setup() { // Begin serial transmission, initialize all pins, set zero dista
 }
 
 void startBot() {
-  zeroDistance(zeroConfidence);
-
-  Serial.print("Starting on button press...");
+  digitalWrite(LEDPin, HIGH);
   requireButtonPress();
-  Serial.println("Start");
+  digitalWrite(LEDPin, LOW);
+  zeroDistance(zeroConfidence);
+  digitalWrite(LEDPin, HIGH);
+  requireButtonPress();
+  digitalWrite(LEDPin, LOW);
 }
 
+boolean isButtonDown() {
+  return digitalRead(buttonPin) == HIGH;
+}
 
 void requireButtonPress() {
   while (isButtonUp()) { // wait for button down
@@ -61,10 +63,6 @@ void requireButtonPress() {
   while (isButtonDown()) { // wait for button up
 
   }
-}
-
-boolean isButtonDown() {
-  return digitalRead(buttonPin) == HIGH;
 }
 
 boolean isButtonUp() {
@@ -79,15 +77,13 @@ void loop() { // measure distance, output its state within the min and max measu
 
     while (isButtonDown()) {
     }
-    digitalWrite(LEDPin, HIGH);
-    requireButtonPress();
-    digitalWrite(LEDPin, LOW);
     startBot();
   }
 
+
   wasLastDown = isButtonDown();
 
-  distance = ping();
+  float distance = ping();
   float deltaDistance = distance - lastDistance;
 
   // If the distance is within reading range
@@ -101,29 +97,43 @@ void loop() { // measure distance, output its state within the min and max measu
       tooMuchDelta = -1;
     }
 
+    int tooLittleDelta = 0;
+    if (deltaDistance <= minDelta) { // Moving away from the wall too slowly
+      tooLittleDelta = 1;
+    }
+    else if (deltaDistance >= -minDelta) { // moving towards the wall too slowly
+      tooLittleDelta = -1;
+    }
+
     // If within the threshold, move forward
     if ((distance > minThreshold && distance < maxThreshold)) {
-      Serial.println("Forwards");
+      //Serial.println("Forwards");
       stepForward();
     }
     else if (distance > maxThreshold) { // Moving away from wall
       if (tooMuchDelta < 0) { // If turning too sharp, turn back
-        Serial.println("Turning Towards Wall TOO FAST, moving back");
+        //Serial.println("Turning Towards Wall TOO FAST, moving back");
         stepLeft();
       }
-      else { // Turn towards the wall
-        Serial.println("Turning Towards Wall");
+      else if (tooLittleDelta < 0) { // Turn towards the wall
+        //Serial.println("Turning Towards Wall");
         stepRight();
+      }
+      else {
+        stepForward();
       }
     }
     else if (distance < minThreshold) { // Moving towards wall
       if (tooMuchDelta > 0) { // If turning too sharp, turn back
-        Serial.println("Turning Away from Wall TOO FAST, moving back");
+        //Serial.println("Turning Away from Wall TOO FAST, moving back");
         stepRight();
       }
-      else { // Turn away from the wall
-        Serial.println("Turning Away from Wall");
+      else if (tooLittleDelta > 0) { // Turn away from the wall
+        //Serial.println("Turning Away from Wall");
         stepLeft();
+      }
+      else {
+        stepForward();
       }
     }
 
@@ -187,7 +197,7 @@ void loop() { // measure distance, output its state within the min and max measu
     stepForward();
   }
 
-  delay(stepDistance);
+  delay(stepDelay);
 }
 
 void zeroDistance(int measureCount) { // measure a provided amount of times, set the thresholds according to the average
@@ -220,7 +230,7 @@ float ping() { // receive a reading from the ultrasonic distance sensor
   delayMicroseconds(10);
 
   digitalWrite(trigPin, LOW);
-  duration = pulseIn(echoPin, HIGH);
+  float duration = pulseIn(echoPin, HIGH);
 
   state = !state;
 
@@ -244,7 +254,7 @@ void stepLeft() { // left motor off, right motor on
   digitalWrite(motorRightA, HIGH);
   digitalWrite(motorRightB, LOW);
 
-  tone(motorLeftA, 140, 100);
+  tone(motorLeftA, 500, 50);
 
   digitalWrite(stateGreen, LOW);
   digitalWrite(stateYellow, HIGH);
@@ -257,7 +267,7 @@ void stepRight() { // right motor off, left motor on
   //digitalWrite(motorRightA, LOW);
   digitalWrite(motorRightB, LOW);
 
-  tone(motorRightA, 140, 100);
+  tone(motorRightA, 500, 50);
 
   digitalWrite(stateGreen, LOW);
   digitalWrite(stateYellow, HIGH);
