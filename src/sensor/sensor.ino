@@ -1,7 +1,7 @@
 #define soundSpeed 58.2
 
-#define trigPin 2 // Triggers the sensor to send data back to the arduino
-#define echoPin 3 // Receive channel for sensor data
+#define trigPinAlpha 2 // Triggers the sensor to send data back to the arduino
+#define echoPinAlpha 3 // Receive channel for sensor data
 #define buttonPin 4 //  Button pin for starting the arduino
 #define motorLeftA A0 // Left side positive motor control pin
 #define motorLeftB A1 // Left side negative motor control pin
@@ -25,10 +25,11 @@ int minThreshold;
 int maxThreshold;
 float lastDistance;
 boolean state = true;
+int stepCounter;
 
 void setup() { // Begin serial transmission, initialize all pins, set zero distance, wait for start button
-  pinMode(trigPin, OUTPUT);
-  pinMode(echoPin, INPUT);
+  pinMode(trigPinAlpha, OUTPUT);
+  pinMode(echoPinAlpha, INPUT);
   pinMode(LEDPin, OUTPUT);
   pinMode(buttonPin, INPUT);
   pinMode(motorLeftA, OUTPUT);
@@ -50,6 +51,8 @@ void startBot() {
   digitalWrite(LEDPin, HIGH);
   requireButtonPress();
   digitalWrite(LEDPin, LOW);
+
+  stepCounter = 0;
 }
 
 boolean isButtonDown() {
@@ -83,12 +86,17 @@ void loop() { // measure distance, output its state within the min and max measu
 
   wasLastDown = isButtonDown();
 
-  float distance = ping();
+  float distance = pingAlpha();
   float deltaDistance = distance - lastDistance;
 
+  Serial.println(stepCounter);
+
+//spin time
+  if (stepCounter > 250 && stepCounter < 400) {
+    stepLeft();
+  }
   // If the distance is within reading range
   if (distance >= minimumRange && distance <= maximumRange) {
-
     int tooMuchDelta = 0;
     if (deltaDistance >= maxDelta) { // Moving away from the wall too quickly
       tooMuchDelta = 1;
@@ -197,13 +205,14 @@ void loop() { // measure distance, output its state within the min and max measu
     stepForward();
   }
 
+  stepCounter++;
   delay(stepDelay);
 }
 
 void zeroDistance(int measureCount) { // measure a provided amount of times, set the thresholds according to the average
   float sum = 0;
   for (int i = 0; i < measureCount; i++) {
-    sum += ping();
+    sum += pingAlpha();
   }
   sum /= measureCount;
   lastDistance = sum; // By default, the last distance is the current distanceM
@@ -216,21 +225,21 @@ void zeroDistance(int measureCount) { // measure a provided amount of times, set
   digitalWrite(stateGreen, HIGH);
 }
 
-float ping() { // receive a reading from the ultrasonic distance sensor
+float pingAlpha() { // receive a reading from the ultrasonic distance sensor
   if (state) {
     digitalWrite(LEDPin, HIGH);
   } else {
     digitalWrite(LEDPin, LOW);
   }
 
-  digitalWrite(trigPin, LOW);
+  digitalWrite(trigPinAlpha, LOW);
   delayMicroseconds(2);
 
-  digitalWrite(trigPin, HIGH);
+  digitalWrite(trigPinAlpha, HIGH);
   delayMicroseconds(10);
 
-  digitalWrite(trigPin, LOW);
-  float duration = pulseIn(echoPin, HIGH);
+  digitalWrite(trigPinAlpha, LOW);
+  float duration = pulseIn(echoPinAlpha, HIGH);
 
   state = !state;
 
@@ -283,5 +292,9 @@ void stepHalt() { // both motors off
   digitalWrite(stateGreen, LOW);
   digitalWrite(stateYellow, LOW);
   digitalWrite(stateRed, HIGH);
+}
+
+void loopStart(int startLocation) {
+  // turn left until the startlocation is met again
 }
 
