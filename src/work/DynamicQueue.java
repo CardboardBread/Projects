@@ -6,17 +6,18 @@ public class DynamicQueue {
 
 	private WorkThread[] workers;
 	private Queue<WorkUnit> workQueue;
-	private int sequence = 0;
+	private static int sequence = 0;
 
 	public DynamicQueue(int threadCount) {
 		workers = new WorkThread[threadCount];
 		for (WorkThread worker : workers) {
+			worker = new WorkThread(10);
 			worker.start();
 		}
 	}
 
 	public void addWork(WorkUnit data) {
-		workQueue.add(new PrintCommand("Hello World!"));
+		workQueue.add(data);
 		sequence++;
 	}
 
@@ -26,45 +27,83 @@ public class DynamicQueue {
 
 }
 
-interface WorkUnit {
+class WorkUnit {
 
-	public void execute();
+	private long workID;
+	private Object[] data;
+
+	public WorkUnit(Object data, long ident) {
+		this(new Object[] { data }, ident);
+	}
+
+	public WorkUnit(Object[] data, long ident) {
+		this.workID = ident;
+		this.data = data;
+	}
+
+	public void execute() {
+		System.out.println("Work @ " + data.toString());
+	}
+
+	public long getID() {
+		return workID;
+	}
+
+	public Object[] getData() {
+		return data;
+	}
 
 }
 
 class WorkThread extends Thread {
 
-	private WorkUnit work;
+	private Queue<WorkUnit> workQueue;
+	private long sleep;
+	private boolean running;
 
-	public void start() {
-		work = null;
+	public WorkThread(long sleep) {
+		this.sleep = sleep;
 	}
-	
-	public void setWork(WorkUnit unit) {
-		work = unit;
+
+	public void addWork(WorkUnit work) {
+		workQueue.add(work);
 	}
 
 	public void run() {
-		while (true) {
-			if (work != null) {
-				work.execute();
+		while (running) {
+			if (workQueue.peek() != null) {
+				workQueue.poll().execute();
+			}
+			try {
+				Thread.sleep(sleep);
+			} catch (InterruptedException e) {
+				e.printStackTrace();
 			}
 		}
 	}
-
 }
 
-class PrintCommand implements WorkUnit {
+class PrintCommand extends WorkUnit {
 
-	private String text;
+	private String[] text;
 
-	public PrintCommand(String text) {
-		this.text = text;
+	public PrintCommand(String data, long ident) {
+		this(new String[] { data }, ident);
 	}
 
-	@Override
+	public PrintCommand(String[] data, long ident) {
+		super(data, ident);
+		this.text = data;
+	}
+
 	public void execute() {
-		System.out.println(text);
+		for (String str : text) {
+			System.out.println(str);
+		}
+	}
+
+	public String[] getData() {
+		return text;
 	}
 
 }
