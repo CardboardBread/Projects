@@ -92,11 +92,11 @@ void loop() { // measure distance, output its state within the min and max measu
   Serial.println(stepCounter);
 
 //spin time
-  if (stepCounter > 250 && stepCounter < 320) {
+  if (stepCounter > 250 && stepCounter < 400) {
     stepLeft();
   }
   // If the distance is within reading range
-  else if (distance >= minimumRange && distance <= maximumRange) {
+  if (distance >= minimumRange && distance <= maximumRange) {
     int tooMuchDelta = 0;
     if (deltaDistance >= maxDelta) { // Moving away from the wall too quickly
       tooMuchDelta = 1;

@@ -42,4 +42,11 @@ public class Deck {
 		}
 	}
 
+	public static void main(String[] args) {
+		Deck d = new Deck();
+		for (int i = 0; i < DECK_SIZE; i++) {
+			System.out.println(d.draw().toString());
+		}
+	}
+
 }
