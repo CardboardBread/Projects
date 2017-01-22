@@ -36,10 +36,14 @@ public class Deck {
 	public Card add(Card card) {
 		if (stack.size() < DECK_SIZE) {
 			stack.push(card);
-			return card;
-		} else {
 			return null;
+		} else {
+			return card;
 		}
+	}
+
+	public Card[] stack() {
+		return stack.toArray(new Card[stack.size()]);
 	}
 
 	public static void main(String[] args) {
