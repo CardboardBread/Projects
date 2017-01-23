@@ -1,124 +1,157 @@
 package dicegame;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.Random;
 
 public class DiceGame {
-	
-	public static final int SAMPLE_SIZE = 1000;
-	public static final int TRIALS = 10000;
-	public static final int ROUNDS = 8;
-	
-	public static final int[] DiceA = {7,7,7,7,1,1};
-	public static final int[] DiceB = {5,5,5,5,5,5};
-	public static final int[] DiceC = {9,9,3,3,3,3};
-	public static final int[] DiceD = {8,8,8,2,2,2};
-	
-	public static ArrayList<TrialResult> results;
-	
-	public static int rollDie (String die) {
-		Random rand = new Random();
-		if (die.contains("A")) {
-			return DiceA[rand.nextInt(DiceA.length)];
-		} else if (die.contains("B")) {
-			return DiceB[rand.nextInt(DiceB.length)];
-		} else if (die.contains("C")) {
-			return DiceC[rand.nextInt(DiceC.length)];
-		} else if (die.contains("D")) {
-			return DiceD[rand.nextInt(DiceD.length)];
-		} else {
-			return 0;
+	public static void main(String[] args) {
+		ArrayList<int[]> results = new ArrayList<int[]>();
+		for (int i = 0; i < 20; i++) {
+			results.add(trial());
 		}
+
+		double aSum = 0;
+		System.out.print("[");
+		for (int i = 0; i < results.size(); i++) {
+			aSum += results.get(i)[0];
+			System.out.print(results.get(i)[0] + (i == results.size() - 1 ? "]" : ", "));
+		}
+		System.out.println(" " + aSum / results.size());
+
+		double bSum = 0;
+		System.out.print("[");
+		for (int i = 0; i < results.size(); i++) {
+			bSum += results.get(i)[1];
+			System.out.print(results.get(i)[1] + (i == results.size() - 1 ? "]" : ", "));
+		}
+		System.out.println(" " + bSum / results.size());
+
+		double tSum = 0;
+		System.out.print("[");
+		for (int i = 0; i < results.size(); i++) {
+			tSum += results.get(i)[2];
+			System.out.print(results.get(i)[2] + (i == results.size() - 1 ? "]" : ", "));
+		}
+		System.out.println(" " + tSum / results.size());
 	}
-	
-	public static TrialResult trial (int trialCount, int rounds) {
+
+	private static int[] trial() {
 		int aWins = 0;
 		int bWins = 0;
 		int ties = 0;
-		int[] aWinsTotal = new int[trialCount];
-		int[] bWinsTotal = new int[trialCount];
-		String[][] aStrat = new String[trialCount][rounds];
-		String[][] bStrat = new String[trialCount][rounds];
-		
-		for (int i = 0; i < trialCount; i++) {
-			//System.out.println("Trial " + (i + 1));
-			int aWinsTrial = 0;
-			int bWinsTrial = 0;
-			
-			ArrayList<String> playerA = new ArrayList<String>(Arrays.asList("A", "A", "B", "B", "C", "C", "D", "D"));
-			ArrayList<String> playerB = new ArrayList<String>(Arrays.asList("A", "A", "B", "B", "C", "C", "D", "D"));
-			Collections.shuffle(playerA);
-			Collections.shuffle(playerB);
-			
-			for (int k = 0; k < rounds; k++) {
-				int aRoll = rollDie(playerA.get(k));
-				int bRoll = rollDie(playerB.get(k));
-				aStrat[i][k] = playerA.get(k);
-				bStrat[i][k] = playerB.get(k);
-				//System.out.println("A rolled " + aRoll + " and B rolled " + bRoll);
-				if (aRoll > bRoll) {
-					//System.out.println("A wins!");
-					aWinsTrial++;
-				} else if (bRoll > aRoll) {
-					//System.out.println("B wins!");
-					bWinsTrial++;
-				} else {
-					//System.out.println("Tie!");
-				}
-			}
-			
-			//System.out.println("A won " + aWinsTrial + " times");
-			//System.out.println("B won " + bWinsTrial + " times");
-			aWinsTotal[i] = aWinsTrial;
-			bWinsTotal[i] = bWinsTrial;
-			if (aWinsTrial > bWinsTrial) {
+
+		ArrayList<Dice> playerA = new ArrayList<Dice>(
+				Arrays.asList(Dice.A, Dice.A, Dice.B, Dice.B, Dice.C, Dice.C, Dice.D, Dice.D));
+		ArrayList<Dice> playerB = new ArrayList<Dice>(
+				Arrays.asList(Dice.A, Dice.A, Dice.B, Dice.B, Dice.C, Dice.C, Dice.D, Dice.D));
+
+		Collections.shuffle(playerB);
+
+		Iterator<Dice> IteratorB = playerB.iterator();
+
+		while (IteratorB.hasNext()) {
+			Dice bDice = IteratorB.next();
+			int bRoll = rollDie(bDice);
+			Dice aDice = counter(bDice, playerA);
+			int aRoll = rollDie(aDice);
+			// System.out.println("B:" + bDice.name() + "," + bRoll + " A:" +
+			// aDice.name() + "," + aRoll);
+
+			if (aRoll > bRoll) {
 				aWins++;
-			} else if (bWinsTrial > aWinsTrial) {
+			} else if (aRoll == bRoll) {
 				bWins++;
 			} else {
 				ties++;
 			}
+
+			IteratorB.remove();
 		}
-		//System.out.println("A won " + aWins + " trials");
-		//System.out.println("B won " + bWins + " trials");
-		//System.out.println("They tied in " + ties + " trials");
-		String winner;
-		if (aWins > bWins) {
-			//System.out.println("A won over " + trialCount + " " + rounds + "-round trials with a " + (aWins - bWins) + " trial lead");
-			winner = "A";
-		} else if (bWins > aWins) {
-			//System.out.println("B won over " + trialCount + " " + rounds + "-round trials with a " + (bWins - aWins) + " trial lead");
-			winner = "B";
-		} else {
-			//System.out.println("Both players tied over " + trialCount + " " + rounds + "-round trials");
-			winner = "T";
-		}
-		return new TrialResult(aWins,bWins,ties,winner,aWinsTotal,bWinsTotal,aStrat,bStrat);
+
+		return new int[] { aWins, bWins, ties };
 	}
-	
-	public static void sampleCollector (ArrayList<TrialResult> subject) {
-		int aWins = 0;
-		int bWins = 0;
-		int ties = 0;
-		for (TrialResult result : subject) {
-			if (result.getWinner() == "A") {
-				aWins++;
-			} else if (result.getWinner() == "B") {
-				bWins++;
-			} else if (result.getWinner() == "T") {
-				ties++;
+
+	private static Dice counter(Dice counter, ArrayList<Dice> list) {
+		ArrayList<Dice> pool = list;
+
+		switch (counter) {
+		case A:
+			if (pool.contains(Dice.B)) {
+				return pool.remove(pool.indexOf(Dice.B));
+			} else if (pool.contains(Dice.A)) {
+				return pool.remove(pool.indexOf(Dice.A));
+			} else if (pool.contains(Dice.C)) {
+				return pool.remove(pool.indexOf(Dice.C));
+			} else if (pool.contains(Dice.D)) {
+				return pool.remove(pool.indexOf(Dice.D));
 			}
+			break;
+		case B:
+			if (pool.contains(Dice.C)) {
+				return pool.remove(pool.indexOf(Dice.C));
+			} else if (pool.contains(Dice.B)) {
+				return pool.remove(pool.indexOf(Dice.B));
+			} else if (pool.contains(Dice.D)) {
+				return pool.remove(pool.indexOf(Dice.D));
+			} else if (pool.contains(Dice.A)) {
+				return pool.remove(pool.indexOf(Dice.A));
+			}
+			break;
+		case C:
+			if (pool.contains(Dice.A)) {
+				return pool.remove(pool.indexOf(Dice.A));
+			} else if (pool.contains(Dice.D)) {
+				return pool.remove(pool.indexOf(Dice.D));
+			} else if (pool.contains(Dice.C)) {
+				return pool.remove(pool.indexOf(Dice.C));
+			} else if (pool.contains(Dice.B)) {
+				return pool.remove(pool.indexOf(Dice.B));
+			}
+			break;
+		case D:
+			if (pool.contains(Dice.A)) {
+				return pool.remove(pool.indexOf(Dice.A));
+			} else if (pool.contains(Dice.B)) {
+				return pool.remove(pool.indexOf(Dice.B));
+			} else if (pool.contains(Dice.D)) {
+				return pool.remove(pool.indexOf(Dice.D));
+			} else if (pool.contains(Dice.C)) {
+				return pool.remove(pool.indexOf(Dice.C));
+			}
+			break;
+		default:
+			return null;
 		}
-		System.out.println("A won " + aWins + " samples, B won " + bWins + " samples, tying " + ties + " times");
+		return counter;
 	}
 
-	public static void main(String[] args) {
-		results = new ArrayList<TrialResult>();
-		for (int i = 0; i < SAMPLE_SIZE; i++) {
-			results.add(trial(TRIALS, ROUNDS));
-		}
-		sampleCollector(results);
+	private static int rollDie(Dice die) {
+		Random rand = new Random();
+		return die.side(rand.nextInt(die.count));
 	}
 
+}
+
+enum Dice {
+	A(7, 7, 7, 7, 1, 1),
+
+	B(5, 5, 5, 5, 5, 5),
+
+	C(9, 9, 3, 3, 3, 3),
+
+	D(8, 8, 8, 2, 2, 2);
+
+	private final int[] sides;
+	public final int count = 6;
+
+	Dice(int... sides) {
+		this.sides = sides;
+	}
+
+	public int side(int index) {
+		return sides[index];
+	}
 }

@@ -39,6 +39,8 @@ class Player {
 		for (Card c : cards) {
 			hand.add(c);
 		}
+		this.next = next;
+		this.last = last;
 	}
 
 	public void draw(Deck source) {
