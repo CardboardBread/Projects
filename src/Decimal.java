@@ -1,4 +1,4 @@
-package mathematics;
+
 
 public class Decimal {
 

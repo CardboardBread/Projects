@@ -2,25 +2,27 @@ package mathematics;
 
 public class Exponent extends Argument {
 
-	private double base;
-	private double power;
+	public static final char SYMBOL = '^';
 
-	public Exponent(double b, double x) {
-		super(true);
-		base = b;
-		power = x;
+	private Argument base;
+	private Argument exponent;
+
+	public Exponent(Argument base, Argument exponent) {
+		super(base.data() + SYMBOL + exponent.data(), base.isNumber() && exponent.isNumber());
+		this.base = base;
+		this.exponent = exponent;
 	}
 
-	public double evaluate() {
-		return Math.pow(base, power);
-	}
-
-	public double power() {
-		return power;
-	}
-
-	public double base() {
+	public Argument base() {
 		return base;
+	}
+
+	public Argument exponent() {
+		return exponent;
+	}
+
+	public boolean equals(Exponent arg) {
+		return data().equals(arg.data());
 	}
 
 }

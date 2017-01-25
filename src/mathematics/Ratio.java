@@ -2,29 +2,27 @@ package mathematics;
 
 public class Ratio extends Argument {
 
-	private double numerator;
-	private double denominator;
+	public static final char SYMBOL = '/';
 
-	public Ratio(double a, double b) {
-		super(true);
-		numerator = a;
-		denominator = b;
+	private Argument numerator;
+	private Argument denominator;
+
+	public Ratio(Argument numerator, Argument denominator) {
+		super(numerator.data() + SYMBOL + denominator.data(), numerator.isNumber() && denominator.isNumber());
+		this.numerator = numerator;
+		this.denominator = denominator;
 	}
 
-	public double evaluate() {
-		return numerator / denominator;
-	}
-
-	public double numerator() {
+	public Argument numerator() {
 		return numerator;
 	}
 
-	public double denominator() {
+	public Argument denominator() {
 		return denominator;
 	}
-	
-	public String toString() {
-		return "" + numerator + "/" + denominator;
+
+	public boolean equals(Ratio arg) {
+		return data().equals(arg.data());
 	}
 
 }

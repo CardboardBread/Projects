@@ -2,32 +2,31 @@ package mathematics;
 
 public class Operation extends Argument {
 
-	private double A;
-	private OperationType type;
-	private double B;
+	private Argument left;
+	private Argument right;
+	private Operator type;
 
-	public Operation(double a, OperationType op, double b) {
-		super(true);
-		A = a;
-		B = b;
-		type = op;
+	public Operation(Argument left, Argument, right, Operator type) {
+		super(left.data() + type.symbol() + right.data(), left.isNumber() + right.isNumber());
+		this.left = left;
+		this.right = right;
+		this.type = type;
 	}
-	
-	public double evaluate() {
-		switch (type) {
-		case ADDITION:
-			return A + B;
-		case SUBTRACTION:
-			return A - B;
-		case MULTIPLICATION:
-			return A * B;
-		case DIVISION:
-			return A / B;
-		case EXPONENTS:
-			return Math.pow(A, B);
-		default:
-			return Double.NaN;
-		}
+
+	public Argument left() {
+		return left;
+	}
+
+	public Argument right() {
+		return right;
+	}
+
+	public Operator type() {
+		return type;
+	}
+
+	public boolean equals(Operation arg) {
+		return data().equals(arg.data());
 	}
 
 }
