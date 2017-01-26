@@ -6,8 +6,8 @@ public class Operation extends Argument {
 	private Argument right;
 	private Operator type;
 
-	public Operation(Argument left, Argument, right, Operator type) {
-		super(left.data() + type.symbol() + right.data(), left.isNumber() + right.isNumber());
+	public Operation(Argument left, Argument right, Operator type) {
+		super(left.data() + type.symbol() + right.data(), left.isNumber() && right.isNumber());
 		this.left = left;
 		this.right = right;
 		this.type = type;
