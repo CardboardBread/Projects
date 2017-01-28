@@ -1,5 +1,7 @@
 package mathematics;
 
+import java.math.BigDecimal;
+
 public class Argument {
 
 	private String data;
@@ -26,6 +28,18 @@ public class Argument {
 
 	public String data() {
 		return data;
+	}
+
+	public BigDecimal evaluate() {
+		if (isNumber()) {
+			return eval();
+		} else {
+			return null;
+		}
+	}
+
+	protected BigDecimal eval() {
+		return new BigDecimal(data);
 	}
 
 	public boolean equals(Argument arg) {

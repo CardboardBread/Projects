@@ -2,15 +2,13 @@ package mathematics;
 
 public class Operation extends Argument {
 
-	private Argument left;
-	private Argument right;
-	private Operator type;
+	protected Argument left;
+	protected Argument right;
 
-	public Operation(Argument left, Argument right, Operator type) {
-		super(left.data() + type.symbol() + right.data(), left.isNumber() && right.isNumber());
+	public Operation(Argument left, char operation, Argument right) {
+		super(left.data() + operation + right.data(), left.isNumber() && right.isNumber());
 		this.left = left;
 		this.right = right;
-		this.type = type;
 	}
 
 	public Argument left() {
@@ -19,14 +17,6 @@ public class Operation extends Argument {
 
 	public Argument right() {
 		return right;
-	}
-
-	public Operator type() {
-		return type;
-	}
-
-	public boolean equals(Operation arg) {
-		return data().equals(arg.data());
 	}
 
 }

@@ -1,4 +1,4 @@
-
+import java.util.Random;
 
 public class Decimal {
 
@@ -44,8 +44,10 @@ public class Decimal {
 	}
 
 	public static void main(String[] args) {
-		Decimal d = new Decimal(Double.MAX_VALUE);
+		Random rand = new Random();
+		Decimal d = new Decimal(rand.nextFloat());
 		System.out.println(d.getRaw());
+		System.out.println(d.getRaw().charAt(1));
 		System.out.println(d.decimalIndex());
 		System.out.println(d.value());
 	}

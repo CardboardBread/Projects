@@ -1,5 +1,7 @@
 package mathematics;
 
+import java.math.BigDecimal;
+
 public class Exponent extends Argument {
 
 	public static final char SYMBOL = '^';
@@ -20,9 +22,11 @@ public class Exponent extends Argument {
 	public Argument exponent() {
 		return exponent;
 	}
-
-	public boolean equals(Exponent arg) {
-		return data().equals(arg.data());
+	
+	@Override
+	protected BigDecimal eval() {
+		return base.evaluate().pow(exponent.evaluate().intValue());
+		
 	}
 
 }
