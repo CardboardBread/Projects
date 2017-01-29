@@ -1,6 +1,8 @@
 package mathematics;
 
-public class Operation extends Argument {
+import java.math.BigDecimal;
+
+public abstract class Operation extends Argument {
 
 	protected Argument left;
 	protected Argument right;
@@ -18,5 +20,7 @@ public class Operation extends Argument {
 	public Argument right() {
 		return right;
 	}
+
+	protected abstract BigDecimal eval();
 
 }

@@ -1,9 +1,11 @@
 package mathematics;
 
+import java.math.BigDecimal;
+
 public class Variable extends Argument {
 
-	protected char identifier;
-	public Number value;
+	private char identifier;
+	private BigDecimal value;
 
 	public Variable(char identifier) {
 		super("" + identifier, false);
@@ -14,12 +16,12 @@ public class Variable extends Argument {
 		return identifier;
 	}
 
-	public <E extends Number> Number value(E value) {
+	public BigDecimal value(BigDecimal value) {
 		this.value = value;
 		return value;
 	}
 
-	public Number value() {
+	public BigDecimal value() {
 		return value;
 	}
 
