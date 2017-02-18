@@ -1,5 +1,4 @@
 
-
 import java.util.ArrayList;
 
 public class ChangeCalc {
@@ -9,7 +8,7 @@ public class ChangeCalc {
 	public static void main(String[] args) {
 		int remaining = charge;
 		ArrayList<Coin> change = new ArrayList<Coin>();
-		
+
 		while (remaining > 0) {
 
 			Coin largest = Coin.ONE;
@@ -39,8 +38,7 @@ enum Currency {
 }
 
 enum Coin {
-	ONE(1), TWO(2), FIVE(5), TEN(10), TWENTY(20), TWENTYFIVE(25), FIFTY(50), HUNDRED(
-			100), TWOHUNDRED(200);
+	ONE(1), TWO(2), FIVE(5), TEN(10), TWENTY(20), TWENTYFIVE(25), FIFTY(50), HUNDRED(100), TWOHUNDRED(200);
 
 	private final int value;
 
