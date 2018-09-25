@@ -12,7 +12,7 @@ public enum CardType {
 		return values()[ordinal];
 	}
 
-	public CardType getLast() {
+	public CardType getPrevious() {
 		int newOrdinal = ordinal() - 1;
 
 		if (newOrdinal < 0) {

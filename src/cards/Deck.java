@@ -1,5 +1,6 @@
 package cards;
 
+import java.util.Collections;
 import java.util.Stack;
 
 public class Deck {
@@ -44,6 +45,15 @@ public class Deck {
 
 	public Card[] stack() {
 		return stack.toArray(new Card[stack.size()]);
+	}
+	
+	public boolean shuffle() {
+		if (stack.size() > 1) {
+			Collections.shuffle(stack);
+			return true;
+		} else {
+			return false;
+		}
 	}
 
 	public static void main(String[] args) {

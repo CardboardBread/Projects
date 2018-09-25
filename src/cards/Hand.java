@@ -28,5 +28,9 @@ public class Hand {
 	public void add(Card subject) {
 		hand.add(subject);
 	}
+	
+	public Card[] list() {
+		return hand.toArray(new Card[hand.size()]);
+	}
 
 }

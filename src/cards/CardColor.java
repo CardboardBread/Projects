@@ -9,6 +9,14 @@ public enum CardColor {
 
 		return values()[ordinal];
 	}
+	
+	public CardColor getOpposite() {
+		if (this == CardColor.BLACK) {
+			return CardColor.RED;
+		} else {
+			return CardColor.BLACK;
+		}
+	}
 
 	@Override
 	public String toString() {

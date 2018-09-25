@@ -16,7 +16,7 @@ public enum CardSuite {
 		return values()[ordinal];
 	}
 
-	public CardSuite getLast() {
+	public CardSuite getPrevious() {
 		int newOrdinal = ordinal() - 1;
 
 		if (newOrdinal < 0) {
