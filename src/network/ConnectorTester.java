@@ -41,7 +41,7 @@ public class ConnectorTester {
 				}
 			}
 			console.close();
-		} catch (NumberFormatException | IOException e) {
+		} catch (Exception e) {
 			e.printStackTrace();
 		}
 	}

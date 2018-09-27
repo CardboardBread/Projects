@@ -1,3 +1,5 @@
+package network;
+
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
@@ -270,6 +272,7 @@ public class Connector implements Runnable {
 	
 	public void send(int index, byte[] data ) throws IOException {
 		send(connected.get(index), data);
+		socketConn.register(selector, SelectionKey.OP_WRITE);
 	}
 
 	/**
