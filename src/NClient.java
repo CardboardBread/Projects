@@ -1,13 +1,8 @@
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.net.Socket;
-import java.net.SocketAddress;
-import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
-import java.util.Iterator;
 import java.util.Scanner;
-import java.util.Set;
 
 public class NClient extends NConnect {
 	
@@ -64,28 +59,6 @@ public class NClient extends NConnect {
 		this(address, Integer.parseInt(port));
 	}
 	
-	protected void keyCheck() throws IOException {
-		selector.select();
-		
-		Set<SelectionKey> selectedKeys = selector.selectedKeys();
-		Iterator<SelectionKey> keyIterator = selectedKeys.iterator();
-
-		while (keyIterator.hasNext()) {
-			SelectionKey key = keyIterator.next();
-
-			if (key.isAcceptable()) {
-				//accept(key);
-			} else if (key.isConnectable()) {
-				establish(key);
-			} else if (key.isWritable()) {
-				write(key);
-			} else if (key.isReadable()) {
-				read(key);
-			}
-			keyIterator.remove();
-		}
-	}
-	
 	public void connect(InetSocketAddress address) throws IOException {
 		client = SocketChannel.open();
 		client.configureBlocking(false);
@@ -106,25 +79,7 @@ public class NClient extends NConnect {
 	public void connect(String address, String port) throws NumberFormatException, IOException {
 		connect(address, Integer.parseInt(port));
 	}
-	
-	public void establish(SelectionKey key) throws IOException {
-		SocketChannel channel = (SocketChannel) key.channel();
-		int waiter = 0;
-		
-		while(!channel.finishConnect()) {
-			if (waiter > 10) {
-				System.out.println(".");
-				waiter = 0;
-			} else {
-				waiter++;
-			}
-		}
-		
-		System.out.println("Connected");
-		channel.register(selector, SelectionKey.OP_READ, null);
-	}
 
-	@Override
 	protected void disconnect() throws IOException {
 		client.close();
 	}

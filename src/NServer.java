@@ -1,14 +1,8 @@
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.net.Socket;
-import java.net.SocketAddress;
-import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.ServerSocketChannel;
-import java.nio.channels.SocketChannel;
-import java.util.Iterator;
 import java.util.Scanner;
-import java.util.Set;
 
 public class NServer extends NConnect {
 	
@@ -63,28 +57,6 @@ public class NServer extends NConnect {
 	
 	public NServer(String address, String port) throws NumberFormatException, IOException {
 		this(address, Integer.parseInt(port));
-	}
-	
-	protected void keyCheck() throws IOException {
-		selector.select();
-		
-		Set<SelectionKey> selectedKeys = selector.selectedKeys();
-		Iterator<SelectionKey> keyIterator = selectedKeys.iterator();
-
-		while (keyIterator.hasNext()) {
-			SelectionKey key = keyIterator.next();
-
-			if (key.isAcceptable()) {
-				accept(key);
-			} else if (key.isConnectable()) {
-				//establish(key);
-			} else if (key.isWritable()) {
-				write(key);
-			} else if (key.isReadable()) {
-				read(key);
-			}
-			keyIterator.remove();
-		}
 	}
 
 	public void host(InetSocketAddress address) throws IOException {

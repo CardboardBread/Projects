@@ -6,6 +6,8 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
+import java.util.Iterator;
+import java.util.Set;
 
 public abstract class NConnect implements Runnable {
 	
@@ -30,12 +32,25 @@ public abstract class NConnect implements Runnable {
 		}
 	}
 	
-	abstract protected void keyCheck() throws IOException;
-	
-	protected void send(byte[] data) throws IOException {
-		for (SelectionKey key: selector.keys()) {
-			if ((key.interestOps() & SelectionKey.OP_READ) != 0)
-			write(key.channel().register(selector, SelectionKey.OP_WRITE, data));
+	protected void keyCheck() throws IOException {
+		selector.select();
+		
+		Set<SelectionKey> selectedKeys = selector.selectedKeys();
+		Iterator<SelectionKey> keyIterator = selectedKeys.iterator();
+
+		while (keyIterator.hasNext()) {
+			SelectionKey key = keyIterator.next();
+
+			if (key.isAcceptable()) {
+				accept(key);
+			} else if (key.isConnectable()) {
+				establish(key);
+			} else if (key.isWritable()) {
+				write(key);
+			} else if (key.isReadable()) {
+				read(key);
+			}
+			keyIterator.remove();
 		}
 	}
 	
@@ -48,6 +63,30 @@ public abstract class NConnect implements Runnable {
 			SocketAddress remoteAddress = client.getRemoteAddress();
 			System.out.println("Accepted connection from: " + remoteAddress);
 			client.register(selector, SelectionKey.OP_READ, null);
+		}
+	}
+	
+	protected void establish(SelectionKey key) throws IOException {
+		SocketChannel channel = (SocketChannel) key.channel();
+		int waiter = 0;
+		
+		while(!channel.finishConnect()) {
+			if (waiter > 10) {
+				System.out.println(".");
+				waiter = 0;
+			} else {
+				waiter++;
+			}
+		}
+		
+		System.out.println("Connected");
+		channel.register(selector, SelectionKey.OP_READ, null);
+	}
+	
+	protected void send(byte[] data) throws IOException {
+		for (SelectionKey key: selector.keys()) {
+			if ((key.interestOps() & SelectionKey.OP_READ) != 0)
+			write(key.channel().register(selector, SelectionKey.OP_WRITE, data));
 		}
 	}
 	
