@@ -113,9 +113,7 @@ public abstract class NConnect implements Runnable {
 			bytesRead = client.read(buffer);
 		}
 		
-		Socket socket = client.socket();
-		SocketAddress remoteAddress = socket.getRemoteSocketAddress();
-		
+		SocketAddress remoteAddress = client.getRemoteAddress();		
 		if (bytesRead == -1) {
 			System.out.println("Connection Closed by: " + remoteAddress);
 			client.close();
