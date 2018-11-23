@@ -26,35 +26,34 @@ public class GTest {
 	public static GCommand interpret(String subject) {
 		List<GParameter> parts = new ArrayList<GParameter>();
 		
-		int paramFlag = 0;
+		int commandFlag = 0;
 		GParameter working = null;
-		String arg = "";
+		String valueStr = "";
 		for (int i = 0; i < subject.length(); i++) {
 			char index = subject.charAt(i);
 			
-			if (index == ' ') {
-				if (paramFlag > 1) {
-					working.setValue(Double.parseDouble(arg));
+			if (Character.isLetter(index)) {
+				if (commandFlag < 1) {
+					commandFlag++;
+					working = new GParameter(index);
+					valueStr = "";
+				}
+				if (commandFlag > 0) {
+					commandFlag++;
 					parts.add(working);
 					working = null;
+					working = new GParameter(index);
+					valueStr = "";
 				}
-				paramFlag = 0;
+				
 				continue;
 			}
 			
-			else if (Character.isLetter(index)) {
-				working = new GParameter(index);
-				paramFlag++;
-			}
-			
-			else if (Character.isDigit(index) && paramFlag > 0) {
-				paramFlag++;
-				arg += index;
-			}
-			
-			else if (paramFlag > 0) {
-				paramFlag++;
-				arg += index;
+			if (Character.isDigit(index)) {
+				if (commandFlag > 0) {
+					valueStr += index;
+				}
+				continue;
 			}
 			
 		}
