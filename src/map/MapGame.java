@@ -17,6 +17,7 @@ public class MapGame extends Application {
 		map = new MapPanel(300,300);
 		Scene scene = new Scene(map);
 		primaryStage.setScene(scene);
+		primaryStage.setTitle("Map Game");
 		primaryStage.show();
 
 	}
