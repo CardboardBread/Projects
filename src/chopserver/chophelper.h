@@ -101,6 +101,10 @@ int send_fstr_to_client(int client_fd, const char *format, ...);
  * Data-Layer functions
  */
 
+Message *partition_message(char *msg, int msg_len);
+
+int append_to_message(Message *msg, char *buf, int buf_len);
+
 /*
  * Replaces the first '\n' or '\r\n' found in str with a null terminator.
  * Returns the index of the new first null terminator if found, or -1 if

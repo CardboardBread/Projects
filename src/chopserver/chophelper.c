@@ -87,19 +87,137 @@ int write_buf_to_client(int client_fd, char *msg, int msg_len) {
     debug_print("write_buf_to_client: message is too long");
     return 1;
   }
+
+  int total = snprintf(buf, BUFSIZE, "%.*s", msg_len, msg);
+
+  int bytes_written = write(client_fd, buf, total);
+  if (bytes_written != total) {
+    if (bytes_written < 0) {
+      debug_print("write_buf_to_client: failed to write message to client");
+      return 1;
+    } else {
+      debug_print("write_buf_to_client: wrote incomplete message to client");
+      return 1;
+    }
+  }
+
+  debug_print("write_buf_to_client: wrote %d bytes to client", total);
+  return 0;
+}
+
+int send_buf_to_client(int client_fd, char *msg, int msg_len) {
+  if (client_fd < MIN_FD || msg == NULL || msg_len < 0) {
+    debug_print("send_buf_to_client: invalid arguments");
+    return -1;
+  }
+
+
 }
 
 int send_message_to_client(int client_fd, Message *msg) {
+  // precondition for invalid arguments
+  if (client_fd < MIN_FD || msg == NULL) {
+    debug_print("send_message_to_client: invalid arguments");
+    return -1;
+  }
 
+  // if message is empty
+  if (msg->first == NULL) {
+    debug_print("send_message_to_client: message is empty");
+    return 0;
+  }
+
+  char *head;
+  int status;
+  int msg_len;
+  Segment *cur;
+  for (cur = msg->first; cur != NULL; cur = cur->next) {
+    head = cur->buf;
+    msg_len = cur->inbuf;
+    status = write_buf_to_client(client_fd, head, msg_len);
+    if (status < 0 || status > 0) {
+      debug_print("send_message_to_client: failed writing entire message");
+      return 1;
+    }
+  }
+
+  debug_print("send_message_to_client: wrote a message with %d segments", msg->seg_count);
+  return 0;
 }
 
 int send_fstr_to_client(int client_fd, const char *format, ...) {
+  // precondition for invalid argument
+  if (client_fd < MIN_FD) {
+    debug_print("send_fstr_to_client: invalid arguments");
+    return -1;
+  }
 
+  char msg[BUFSIZE + 1];
+
+  va_list args;
+  va_start(args, format);
+  vsnprintf(msg, BUFSIZE, format, args);
+  va_end(args);
+
+  return write_buf_to_client(client_fd, msg, BUFSIZE);
 }
 
 /*
  * Data-Layer functions
  */
+
+Message *partition_message(char *msg, int msg_len) {
+  if (msg == NULL || msg_len < 0) {
+    debug_print("partition_message: invalid arguments");
+    return NULL;
+  }
+
+  Message *out = malloc(sizeof(Message));
+  setup_message_struct(out);
+
+  int index = 0;
+  char buf[BUFSIZE];
+  for (int i = 0; i < msg_len; i++) {
+    if (index < BUFSIZE) {
+      buf[index] = msg[i];
+      index++;
+    } else {
+      if (append_to_message(out, buf, BUFSIZE) < 0) {
+        debug_print("partition_message: failed to partition message");
+        return NULL;
+      }
+      memset(buf, 0, BUFSIZE);
+      index = 0;
+    }
+  }
+
+  return out;
+}
+
+int append_to_message(Message *msg, char *buf, int buf_len) {
+  if (msg == NULL || buf == NULL || buf_len < 0) {
+    debug_print("append_to_message: invalid arguments");
+    return -1;
+  }
+
+  if (msg->first == NULL) {
+    msg->first = malloc(sizeof(Segment));
+    reset_segment_struct(msg->first);
+    memmove(msg->first->buf, buf, buf_len);
+    return 0;
+  }
+
+  Segment *cur;
+  for (cur = msg->first; cur != NULL; cur = cur->next) {
+    if (cur->next == NULL) {
+      cur->next = malloc(sizeof(Segment));
+      reset_segment_struct(cur->next);
+      memmove(cur->next, buf, buf_len);
+    }
+  }
+
+  return 0;
+}
 
 int remove_newline(char *buf, int len) {
   // Precondition for invalid arguments
@@ -384,14 +502,18 @@ int reset_message_struct(Message *message) {
     return -1;
   }
 
-  int count = 0;
+  // free every node in the message
   Segment *cur;
+  Segment *last = NULL;
   for (cur = message->first; cur != NULL; cur = cur->next) {
-    reset_segment_struct(cur);
-    count++;
+    free(last);
+    last = cur;
   }
+  free(last);
 
-  message->seg_count = count;
+  // reset struct fields
+  message->first = NULL;
+  message->seg_count = 0;
 
   return 0;
 }
@@ -403,6 +525,7 @@ int reset_segment_struct(Segment *segment) {
     return -1;
   }
 
+  // reset struct fields
   memset(segment->buf, 0, BUFSIZE);
   segment->inbuf = 0;
 
