@@ -32,13 +32,17 @@ int setup_new_client(int listen_fd, Client *clients[]) {
 
   // finding an 'empty' space in the client array
   for (int i = 0; i < MAX_CONNECTIONS; i++) {
+
+    // placing new client in empty space
     if (clients[i] == NULL) {
-      clients[i] = malloc(sizeof(Client));
+      clients[i] = (Client *) malloc(sizeof(Client));
+      clients[i]->buffer = (Buffer *) malloc(sizeof(Buffer));
       reset_client_struct(clients[i]);
       clients[i]->socket_fd = fd;
       debug_print("setup_new_client: placed client at index %d", i);
       return fd;
     }
+
   }
 
   // close the connection since we can't store it
@@ -65,6 +69,7 @@ int remove_client(int client_index, Client *clients[]) {
   close(clients[client_index]->socket_fd);
   free(clients[client_index]);
   clients[client_index] = NULL;
+
   debug_print("remove_client: client %d at index %d removed", sav, client_index);
   return 0;
 }
@@ -76,22 +81,34 @@ int write_buf_to_client(int client_fd, char *msg, int msg_len) {
     return -1;
   }
 
+  // check if message is nonexistent
+  if (msg_len == 0) {
+    debug_print("write_buf_to_client: message is empty");
+    return 0;
+  }
+
+  // check if message is too long
+  if (msg_len > DATA_LEN) {
+    debug_print("write_buf_to_client: message is too long");
+    return 1;
+  }
+
   // remove newline on message
   if (remove_newline(msg, msg_len) < 0) {
     debug_print("write_buf_to_client: failed to remove newline from message");
   }
 
-  // check if message is too long
-  char buf[BUFSIZE];
-  if (msg_len + newlen_len[NEWLINE_CRLF] > BUFSIZE) {
-    debug_print("write_buf_to_client: message is too long");
-    return 1;
-  }
+  // assemble message with network newline
+  char buf[MESG_LEN] = {0};
+  buf[0] = 0;
+  buf[HEAD_LEN + DATA_LEN] = 0;
+  int total = snprintf(buf + HEAD_LEN, DATA_LEN, "%.*s", msg_len, msg);
 
-  int total = snprintf(buf, BUFSIZE, "%.*s", msg_len, msg);
-
+  // write message to target
   int bytes_written = write(client_fd, buf, total);
   if (bytes_written != total) {
+
+    // in case write was not perfectly successful
     if (bytes_written < 0) {
       debug_print("write_buf_to_client: failed to write message to client");
       return 1;
@@ -105,12 +122,7 @@ int write_buf_to_client(int client_fd, char *msg, int msg_len) {
   return 0;
 }
 
-int send_buf_to_client(int client_fd, char *msg, int msg_len) {
-  if (client_fd < MIN_FD || msg == NULL || msg_len < 0) {
-    debug_print("send_buf_to_client: invalid arguments");
-    return -1;
-  }
-
+int write_packet_to_client(int client_fd, Packet *pack) {
 
 }
 
@@ -446,22 +458,33 @@ int is_buffer_full(Buffer *buf) {
 }
 
 /*
- * Utility Functions (non-essential)
+ * Utility Functions
  */
 
 // errno is preserved through this function,
 // it will not change between this function calling and returning.
 void debug_print(const char *format, ...) {
+  // precondition checking if debugging is turned off
   if (debug_fd < MIN_FD) return;
+
+  // saving errno
   int errsav = errno;
 
+  // capturing variable argument list
   va_list args;
   va_start(args, format);
 
+  // printing argument
   dprintf(debug_fd, "%s", debug_header);
   vdprintf(debug_fd, format, args);
   dprintf(debug_fd, "\n");
 
+  // in case errno is nonzero
+  if (errsav > 0) {
+    dprintf(debug_fd, "%s%s\n", debug_header, strerror(errsav));
+  }
+
+  // cleaining up
   va_end(args);
   errno = errsav;
   return;
@@ -488,7 +511,7 @@ int reset_buffer_struct(Buffer *buffer) {
     return -1;
   }
 
-  memset(buffer->buf, 0, BUFSIZE);
+  memset(buffer->buf, 0, MESG_LEN);
   buffer->consumed = 0;
   buffer->inbuf = 0;
 
@@ -503,8 +526,8 @@ int reset_message_struct(Message *message) {
   }
 
   // free every node in the message
-  Segment *cur;
-  Segment *last = NULL;
+  Packet *cur;
+  Packet *last = NULL;
   for (cur = message->first; cur != NULL; cur = cur->next) {
     free(last);
     last = cur;
@@ -518,16 +541,50 @@ int reset_message_struct(Message *message) {
   return 0;
 }
 
-int reset_segment_struct(Segment *segment) {
+int reset_packet_struct(Packet *pack) {
   // precondition for invalid argument
-  if (segment == NULL) {
-    debug_print("reset_segment_struct: invalid arguments");
+  if (pack == NULL) {
+    debug_print("reset_packet_struct: invalid arguments");
     return -1;
   }
 
   // reset struct fields
-  memset(segment->buf, 0, BUFSIZE);
-  segment->inbuf = 0;
+  memset(pack->buf, 0, MESG_LEN);
+  pack->inbuf = 0;
+
+  return 0;
+}
+
+int set_packet_tail(char buf[MESG_LEN], char a, char b, char c, char d) {
+  // precondition for invalid argument
+  if (buf == NULL) {
+    debug_print("set_packet_tail: invalid arguments");
+    return -1;
+  }
+
+  // setting head
+  int offset = 0;
+  buf[offset + 0] = a;
+  buf[offset + 1] = b;
+  buf[offset + 2] = c;
+  buf[offset + 3] = d;
+
+  return 0;
+}
+
+int set_packet_head(char buf[MESG_LEN], char a, char b, char c, char d) {
+  // precondition for invalid argument
+  if (buf == NULL) {
+    debug_print("set_packet_head: invalid arguments");
+    return -1;
+  }
+
+  // setting tail
+  int offset = DATA_LEN + HEAD_LEN;
+  buf[offset + 0] = a;
+  buf[offset + 1] = b;
+  buf[offset + 2] = c;
+  buf[offset + 3] = d;
 
   return 0;
 }

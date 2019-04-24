@@ -9,7 +9,11 @@
   #define PORT 50001
 #endif
 
-#define BUFSIZE 30
+#define MESG_LEN 128
+#define HEAD_LEN 4
+#define TAIL_LEN 4
+#define DATA_LEN 120
+
 #define CONNECTION_QUEUE 5
 #define MAX_CONNECTIONS 20
 
@@ -31,7 +35,7 @@ static const int newlen_len[] = {2, 1};
 typedef enum {NEWLINE_CRLF, NEWLINE_LF} NewlineType;
 
 struct socket_buffer {
-	char buf[BUFSIZE];
+	char buf[MESG_LEN];
 	int consumed;
 	int inbuf;
 };
@@ -43,18 +47,18 @@ struct client {
 };
 typedef struct client Client;
 
-struct message_segment {
-	char buf[BUFSIZE];
+struct packet {
+	char buf[MESG_LEN];
 	int inbuf;
-  struct message_segment *next;
+  struct packet *next;
 };
-typedef struct message_segment Segment;
+typedef struct packet Packet;
 
-struct message_list {
-  struct message_segment *first;
+struct message {
+  struct packet *first;
   int seg_count;
 };
-typedef struct message_list Message;
+typedef struct message Message;
 
 /*
  * Socket-Layer functions
@@ -77,10 +81,18 @@ int remove_client(int client_index, Client *clients[]);
 /*
  * Writes data to the given socket, assuming msg is the beginning of an array
  * of msg_len length.
+ * Refuses to send messages that are too large to fit in a single packet
  * Returns 0 on success, -1 on error, and 1 on an imcomplete/failed write.
  * ERRNO will be preserved from the write call.
  */
 int write_buf_to_client(int client_fd, char *msg, int msg_len);
+
+/*
+ * Writes the given packet to the given socket.
+ * Returns 0 on success, -1 on error, and 1 on an imcomplete/failed write.
+ * ERRNO will be preserved from the write call.
+ */
+int write_packet_to_client(int client_fd, Packet *pack);
 
 /*
  * Writes all the segments in a given message to the given socket.
@@ -197,6 +209,10 @@ int reset_message_struct(Message *message);
 /*
  * Zeroes out all the fields of a given segment structure.
  */
-int reset_segment_struct(Segment *segment);
+int reset_segment_struct(Packet *pack);
+
+int set_packet_head(char buf[MESG_LEN], char a, char b, char c, char d);
+
+int set_packet_head(char buf[MESG_LEN], char a, char b, char c, char d);
 
 #endif
