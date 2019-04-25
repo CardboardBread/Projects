@@ -12,10 +12,10 @@
 #include "chophelper.h"
 
 /*
- * Socket-Layer functions
+ * Client Management functions
  */
 
-int setup_new_client(int listen_fd, Client *clients[]) {
+int setup_new_client(const int listen_fd, Client *clients[]) {
   // precondition for invalid arguments
   if (listen_fd < MIN_FD || clients == NULL) {
     debug_print("setup_new_client: invalid arguments");
@@ -51,7 +51,7 @@ int setup_new_client(int listen_fd, Client *clients[]) {
   return -1;
 }
 
-int remove_client(int client_index, Client *clients[]) {
+int remove_client(const int client_index, Client *clients[]) {
   // precondition for invalid arguments
   if (client_index < MIN_FD) {
     debug_print("remove_client: invalid arguments");
@@ -74,6 +74,10 @@ int remove_client(int client_index, Client *clients[]) {
   return 0;
 }
 
+/*
+ * Sending functions
+ */
+
 int write_buf_to_client(Client *cli, const char *msg, const int msg_len) {
   // precondition for invalid arguments
   if (cli == NULL || msg == NULL || msg_len < 0) {
@@ -95,8 +99,9 @@ int write_buf_to_client(Client *cli, const char *msg, const int msg_len) {
 
   // assemble header with text signals
   char head[PACKET_LEN] = {0};
-  head[PACKET_STATUS] = (char) START_TEXT;
-  head[PACKET_CONTROL1] = (char) msg_len;
+  head[PACKET_STATUS] = START_TEXT;
+  head[PACKET_CONTROL1] = 1;
+  head[PACKET_CONTROL2] = msg_len;
 
   // write header packet to target
   int head_written = write(cli->socket_fd, head, PACKET_LEN);
@@ -141,8 +146,8 @@ int write_packet_to_client(Client *cli, Packet *pack) {
     return -1;
   }
 
-  // mark client with packet status
-  cli->op_flag = pack->head[PACKET_STATUS];
+  // mark client outgoing flag with status
+  cli->out_flag = pack->head[PACKET_STATUS];
 
   // write header packet to target
   int head_written = write(cli->socket_fd, pack->head, PACKET_LEN);
@@ -171,6 +176,9 @@ int write_packet_to_client(Client *cli, Packet *pack) {
       return 1;
     }
   }
+
+  // demark client outgoing flag
+  cli->out_flag = 0;
 
   debug_print("write_packet_to_client: wrote packet of %d bytes to client", bytes_written);
   return 0;
@@ -205,286 +213,118 @@ int send_fstr_to_client(Client *cli, const char *format, ...) {
 }
 
 /*
- * Data-Layer functions
+ * Receiving functions
  */
 
-Message *partition_message(char *msg, int msg_len) {
-  if (msg == NULL || msg_len < 0) {
-    debug_print("partition_message: invalid arguments");
-    return NULL;
+int read_header(Client *cli) {
+  // precondition for invalid argument
+  if (cli == NULL) {
+    debug_print("read_header: invalid argument");
+    return -1;
   }
 
-  Message *out = malloc(sizeof(Message));
-  setup_message_struct(out);
+  // read packet from client
+  char head[PACKET_LEN];
+  int head_read = read(cli->socket_fd, head, PACKET_LEN);
+  if (head_read != PACKET_LEN) {
 
-  int index = 0;
-  char buf[BUFSIZE];
-  for (int i = 0; i < msg_len; i++) {
-    if (index < BUFSIZE) {
-      buf[index] = msg[i];
-      index++;
+    // in case read isn't perfect
+    if (head_read < 0) {
+      debug_print("read_header: failed to read header");
+      return 1;
     } else {
-      if (append_to_message(out, buf, BUFSIZE) < 0) {
-        debug_print("partition_message: failed to partition message");
-        return NULL;
-      }
-      memset(buf, 0, BUFSIZE);
-      index = 0;
+      debug_print("read_header: received incomplete header");
+      return 1;
     }
   }
 
-  return out;
-}
+  // parse the status
+  switch(head[PACKET_STATUS]) {
+    case 0: // NULL
+      debug_print("read_header: received NULL header");
+      break;
 
-int append_to_message(Message *msg, char *buf, int buf_len) {
-  if (msg == NULL || buf == NULL || buf_len < 0) {
-    debug_print("append_to_message: invalid arguments");
-    return -1;
-  }
+    case 1: // Header
+      debug_print("read_header: received extended header");
+      // TODO: implement
+      break;
 
-  if (msg->first == NULL) {
-    msg->first = malloc(sizeof(Segment));
-    reset_segment_struct(msg->first);
-    memmove(msg->first->buf, buf, buf_len);
-    return 0;
-  }
+    case 2: // Text
+      debug_print("read_header: received text header");
+      return parse_text(cli, head[PACKET_CONTROL1], head[PACKET_CONTROL2]);
 
-  Segment *cur;
-  for (cur = msg->first; cur != NULL; cur = cur->next) {
-    if (cur->next == NULL) {
-      cur->next = malloc(sizeof(Segment));
-      reset_segment_struct(cur->next);
-      memmove(cur->next, buf, buf_len);
-    }
+    case 5: // Enquiry
+      debug_print("read_header: received enquiry header");
+      return parse_enquiry(cli, head[PACKET_CONTROL1]);
+
+    case 6: // Acknowledge
+      debug_print("read_header: received acknowledge header");
+      return parse_acknowledge(cli);
+
+    case 21: // Neg Acknowledge
+      debug_print("read_header: received negative acknowledge header");
+      return parse_neg_acknowledge(cli);
+
+    case 24: // Cancel
+      debug_print("read_header: received cancel header");
+      return parse_cancel(cli);
+
+    default: // unsupported/invalid
+      debug_print("read_header: received invalid header");
+      return -1;
+
   }
 
   return 0;
 }
 
-int remove_newline(char *buf, int len) {
-  // Precondition for invalid arguments
-  if (buf == NULL || len < 2) {
-    debug_print("remove_newline: invalid arguments");
+int parse_text(Client *cli, int count, int width) {
+  // precondition for invalid arguments
+  if (cli == NULL || count < 0 || width < 0) {
+    debug_print("parse_text: invalid argument");
     return -1;
   }
 
-  int index;
-  for (index = 1; index < len; index++) {
-    // network newline
-    if (buf[index - 1] == '\r' && buf[index] == '\n') {
-      debug_print("remove_newline: network newline at %d", index);
-      buf[index - 1] = '\0';
-      buf[index] = '\0';
-      return index;
-    }
+  // control 1 count of messages
+  // control 2 size of each message
 
-    // unix newline
-    if (buf[index - 1] != '\r' && buf[index] == '\n') {
-      debug_print("remove_newline: unix newline at %d", index);
-      buf[index] = '\0';
-      return index;
-    }
-  }
+  int bytes_read;
+  char buffer[TEXT_LEN];
+  for (int i = 0; i < count; i++) {
 
-  // nothing found
-  debug_print("remove_newline: no newline found");
-  return -1;
-}
+    // read the expected amount of data
+    bytes_read = read(cli->socket_fd, buffer, width);
+    if (bytes_read != width) {
 
-int convert_to_crlf(char *buf, int len) {
-  // Precondition for invalid arguments
-  if (buf == NULL || len < 1) {
-    debug_print("convert_to_crlf: invalid arguments");
-    return -1;
-  }
-
-  int index;
-  for (index = 0; index < len; index++) {
-    if (buf[index] == '\n') {
-      debug_print("convert_to_crlf: found newline at %d", index);
-
-      // last index
-      if (index == (len - 1)) {
-        debug_print("convert_to_crlf: no space for network newline");
-        return -2;
+      // in case read isn't perfect
+      if (bytes_read < 0) {
+        debug_print("parse_text: failed to read text section");
+        return 1;
       } else {
-        buf[index] = '\r';
-        buf[index + 1] = '\n';
-        return index + 1;
+        debug_print("parse_text: read incomplete text section");
+        return 1;
       }
     }
+
+    // TODO: consume the message
+    printf("Received \"%.*s\"", width, buffer);
   }
 
-  // nothing found
-  debug_print("convert_to_crlf: no newline found");
-  return -1;
-}
-
-int find_network_newline(const char *buf, int inbuf) {
-  // Precondition for invalid arguments
-  if (buf == NULL || inbuf < 2) {
-    debug_print("find_network_newline: invalid arguments");
-    return -1;
-  }
-
-  // stop loop when \r\n is found, fail when over length
-  int index;
-  for (index = 2; !(buf[index - 2] == '\r' && buf[index - 1] == '\n'); index++) {
-    if (index >= inbuf) {
-      debug_print("find_network_newline: no network newline found");
-      return -1;
-    }
-  }
-
-  debug_print("find_network_newline: found network newline at %d", index);
-  return index;
-}
-
-int find_unix_newline(const char *buf, int inbuf) {
-  // Precondition for invalid arguments
-  if (buf == NULL || inbuf < 1) {
-    debug_print("find_unix_newline: invalid arguments");
-    return -1;
-  }
-
-  // only thing in the buffer is a newline
-  if (buf[0] == '\n') {
-    return 1;
-  }
-
-  // stop loop when *\n is found, fail when over length, * meaning any character but \r
-  int index;
-  for (index = 2; !(buf[index - 2] != '\r' && buf[index - 1] == '\n'); index++) {
-    if (index >= inbuf) {
-      debug_print("find_unix_newline: no unix newline found");
-      return -1;
-    }
-  }
-
-  debug_print("find_unix_newline: found unix newline at %d", index);
-  return index;
-}
-
-int read_to_buf(int fd, Buffer *bufstr) {
-  if (fd < MIN_FD || bufstr == NULL) {
-    debug_print("read_to_buf: invalid arguments");
-    return -1;
-  }
-
-  char *head = &(bufstr->buf[bufstr->inbuf]);
-  int left = sizeof(bufstr->buf) - bufstr->inbuf;
-  int total_read = 0;
-
-  int nbytes = read(fd, head, left);
-  if (nbytes > 0) {
-    bufstr->inbuf += nbytes;
-    total_read += nbytes;
-
-    // intermediary step goes here
-    left -= nbytes;
-    head += nbytes;
-
-    debug_print("read_to_buf: read %d bytes into buffer", total_read);
-    return total_read;
-  } else if (nbytes == 0) {
-    debug_print("read_to_buf: fd closed");
-    return 0;
-  } else {
-    debug_print("read_to_buf: encountered error");
-    return -1;
-  }
-
-  debug_print("read_to_buf: instruction error");
-  return -1;
-}
-
-char* get_next_msg(Buffer* buf, int *msg_len, NewlineType newline) {
-  // precondition for invalid arguments
-  if (buf == NULL || msg_len == NULL) {
-    debug_print("get_next_msg: invalid arguments");
-    return NULL;
-  }
-
-  int nl = 0;
-  char *head = &(buf->buf[buf->consumed]);
-  switch (newline) {
-    case NEWLINE_CRLF:
-      nl = find_network_newline(head, buf->inbuf);
-      break;
-    case NEWLINE_LF:
-      nl = find_unix_newline(head, buf->inbuf);
-      break;
-    default:
-      debug_print("get_next_msg: newline type is invalid");
-      return NULL;
-  }
-
-  // error case for finding
-  if (nl < 0) {
-    debug_print("get_next_msg: failed to find any non-consumed newline");
-    return NULL;
-  }
-
-  debug_print("get_next_msg: found non-consumed newline at %d", nl);
-  *msg_len = nl;
-  return head;
-}
-
-int mark_consumed(Buffer *buf, int index) {
-  // precondition for invalid arguments
-  if (buf == NULL || index < 0) {
-    debug_print("mark_consumed: invalid arguments");
-    return -1;
-  }
-
-  buf->consumed = index;
-  debug_print("mark_consumed: consumed set to %d", index);
   return 0;
 }
 
-int advance_consumed(Buffer *buf, int increment) {
-  // precondition for invalid arguments
-  if (buf == NULL || increment < 0) {
-    debug_print("advance_consumed: invalid arguments");
+int parse_cancel(Client *cli) {
+  // precondition for invalid argument
+  if (cli == NULL) {
+    debug_print("parse_cancel: invalid arguments");
     return -1;
   }
 
-  buf->consumed += increment;
-  debug_print("mark_consumed: increased consumed by %d", buf->consumed);
+  // marking this client as closed
+  cli->inc_flag = -1;
+  cli->out_flag = -1;
+
   return 0;
-}
-
-void shift_buffer(Buffer *buf) {
-  // precondition for invalid argument
-  if (buf == NULL) {
-    debug_print("shift_buffer: invalid arguments");
-    return;
-  }
-
-  // complex variables
-  char *head = &(buf->buf[buf->consumed]);
-  int left = buf->inbuf - buf->consumed;
-
-  // memory operations
-  memset(buf->buf, 0, buf->consumed);
-  memmove(buf->buf, head, left);
-
-  // updating fields
-  buf->inbuf -= buf->consumed;
-  buf->consumed = 0;
-
-  debug_print("shift_buffer: cleared consumed, shifted non-consumed");
-  return;
-}
-
-int is_buffer_full(Buffer *buf) {
-  // precondition for invalid argument
-  if (buf == NULL) {
-    debug_print("is_buffer_full: invalid arguments");
-    return -1;
-  }
-
-  return (buf->inbuf == sizeof(buf->buf));
 }
 
 /*
@@ -527,8 +367,10 @@ int reset_client_struct(Client *client) {
     return -1;
   }
 
-  // client socket
+  // struct fields
   client->socket_fd = -1;
+  client->inc_flag = 0;
+  client->out_flag = 0;
 
   // client buffer
   return reset_buffer_struct(client->buffer);
@@ -541,7 +383,7 @@ int reset_buffer_struct(Buffer *buffer) {
     return -1;
   }
 
-  memset(buffer->buf, 0, MESG_LEN);
+  memset(buffer->buf, 0, TEXT_LEN);
   buffer->consumed = 0;
   buffer->inbuf = 0;
 

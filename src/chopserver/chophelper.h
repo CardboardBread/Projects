@@ -48,17 +48,12 @@
 static const int debug_fd = STDERR_FILENO;
 static const char debug_header[] = "[DEBUG] ";
 
-static const char *newline_str[] = {"\r\n", "\n"};
-static const int newlen_len[] = {2, 1};
-
 /*
  * Structures and Types
  */
 
-typedef enum {NEWLINE_CRLF, NEWLINE_LF} NewlineType;
-
 struct socket_buffer {
-	char buf[MESG_LEN];
+	char buf[TEXT_LEN];
 	int consumed;
 	int inbuf;
 };
@@ -66,7 +61,8 @@ typedef struct socket_buffer Buffer;
 
 struct client {
 	int socket_fd;
-  int op_flag;
+  int inc_flag;
+  int out_flag;
 	struct socket_buffer *buffer;
 };
 typedef struct client Client;
@@ -79,7 +75,7 @@ struct packet {
 typedef struct packet Packet;
 
 /*
- * Socket-Layer functions
+ * Client Management functions
  */
 
 /*
@@ -87,14 +83,18 @@ typedef struct packet Packet;
  * Length of clients array is assumed to be MAX_CONNECTIONS.
  * Returns 0 on success, -1 on error and 1 if the list of clients is full.
  */
-int setup_new_client(int listen_fd, Client *clients[]);
+int setup_new_client(const int listen_fd, Client *clients[]);
 
 /*
  * Frees the client at the given index in the given array.
  * Length of client array is assumed to be MAX_CONNECTIONS.
  * Returns 0 on success, -1 on error and 1 if the target client doesn't exist.
  */
-int remove_client(int client_index, Client *clients[]);
+int remove_client(const int client_index, Client *clients[]);
+
+/*
+ * Sending functions
+ */
 
 /*
  * Writes data to the given socket, assuming msg is the beginning of an array
@@ -130,76 +130,24 @@ int send_str_to_client(Client *cli, const char *str);
 int send_fstr_to_client(Client *cli, const char *format, ...);
 
 /*
- * Data-Layer functions
+ * Receiving functions
  */
 
-/*
- * Replaces the first '\n' or '\r\n' found in str with a null terminator.
- * Returns the index of the new first null terminator if found, or -1 if
- * not found.
- */
-int remove_newline(char *str, int len);
+int read_header(Client *cli);
+
+int parse_text(Client *cli, const int control1, const int control2);
+
+int parse_enquiry(Client *cli, const int control1);
+
+int parse_acknowledge(Client *cli);
+
+int parse_neg_acknowledge(Client *cli);
+
+int parse_cancel(Client *cli);
+
 
 /*
- * Replaces the first '\n' found in str with '\r', then
- * replaces the character after it with '\n'.
- * Returns the index of the new '\n' on success, -1 if there is no newline,
- * or -2 if there's no space for a new character.
- */
-int convert_to_crlf(char *buf, int buflen);
-
-/*
- * Search the first n characters of buf for a network newline (\r\n).
- * Return one plus the index of the '\n' of the first network newline,
- * or -1 if no network newline is found.
- */
-int find_network_newline(const char *buf, int buflen);
-
-/*
- * Search the first n characters of buf for an unix newline (\n).
- * Return the index of the first newline, or -1 if no newline is found.
- */
-int find_unix_newline(const char *buf, int buflen);
-
-/*
- * Reads as much as possible from file descriptor fd into the given buffer.
- * Returns number of bytes read, or 0 if fd closed, or -1 on error.
- */
-int read_to_buf(int fd, Buffer *buf);
-
-/*
- * Returns a pointer to the first non-consumed message in the buffer,
- * with the corresponding newline. Sets msg_len to the length of the message.
- * Returns NULL if no full message is found, or on error.
- */
-char* get_next_msg(Buffer *buf, int *msg_len, NewlineType newline);
-
-/*
- * Sets the consumed field on a given buffer to the given value.
- * Returns 0 on completion, -1 on error.
- */
-int mark_consumed(Buffer *buf, int index);
-
-/*
- * Increments the consumed field on a given buffer to the given value.
- * Returns 0 on completion, -1 on error.
- */
-int advance_consumed(Buffer *buf, int increment);
-
-/*
- * Removes consumed characters from the buffer and shifts the rest
- * to make space for new characters.
- * Returns incomplete on error.
- */
-void shift_buffer(Buffer *buf);
-
-/*
- * Returns 1 if buffer is full, 0 if not, -1 on error.
- */
-int is_buffer_full(Buffer *buf);
-
-/*
- * Utility Functions (non-essential)
+ * Utility Functions
  */
 
 /*
