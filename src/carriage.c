@@ -9,13 +9,10 @@ char* itoa (unsigned long long  value,  char str[],  int radix);
 int main(void) {
 
   char buffer[66] = {0};
-  for (int i = 1; i != 0; i = i * 10) {
+  for (unsigned int i = 0; i < 512; i++) {
     itoa(i, buffer, 2);
-    printf("\rDecimal is %11d, Binary is %65s, Char is \"%c\"", i, buffer, i);
-    fflush(stdout);
-    usleep(1000000);
+    printf("Number %3d is %2c or %8s.\n", i, i, buffer);
   }
-  printf("\n");
 
   return 0;
 }
