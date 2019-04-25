@@ -17,8 +17,8 @@
 /// status bytes
 #define NULL_BYTE 0 // basically a no-operation
 #define START_HEADER 1 // control1 indicates number of extra bytes
-#define START_TEXT 2 // contol1 - num of elements, control2 - size of each element
-#define END_TEXT 3 // TODO
+#define START_TEXT 2 // control1 - num of elements, control2 - size of each element
+#define END_TEXT 3 // used in conjuction with variable length START_TEXT
 #define END_TRANSMISSION 4 // TODO
 #define ENQUIRY 5 // basically a ping
 #define ACKNOWLEDGE 6 // signal was received, control1 is recieved status

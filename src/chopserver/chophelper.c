@@ -294,7 +294,7 @@ int read_header(Client *cli) {
 
     case NEG_ACKNOWLEDGE:
       debug_print("read_header: received negative acknowledge header");
-      status = parse_neg_acknowledge(cli);
+      status = parse_neg_acknowledge(cli, head[PACKET_CONTROL1]);
       break;
 
     case IDLE:
@@ -317,15 +317,15 @@ int read_header(Client *cli) {
   return status;
 }
 
-int parse_text(Client *cli, int count, int width) {
+int parse_text(Client *cli, const int control1, const int control2) {
   // precondition for invalid arguments
-  if (cli == NULL || count < 0 || width < 0) {
+  if (cli == NULL || control1 < 0 || control2 < 0) {
     debug_print("parse_text: invalid argument");
     return -1;
   }
 
-  // control 1 count of messages
-  // control 2 size of each message
+  int count = control1;
+  int width = control2;
 
   int bytes_read;
   char buffer[TEXT_LEN];
@@ -405,6 +405,9 @@ int parse_neg_acknowledge(Client *cli, const int control1) {
   }
 
   switch(control1) {
+    case START_TEXT:
+      // TODO: text arguments are invalid/message is invalid
+      break;
     case ENQUIRY:
       // TODO: ping refused
       break;
