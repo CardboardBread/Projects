@@ -5,10 +5,6 @@
  * Macros and Constants
  */
 
-#ifndef PORT
-  #define PORT 50001
-#endif
-
 #define PACKET_LEN 4
 #define TEXT_LEN 255
 
@@ -19,23 +15,30 @@
 #define PACKET_CONTROL2 3 // parameter 2 for packet type
 
 /// status bytes
-#define NULL_BYTE 0
-#define HEADER_BYTE 1
-#define START_TEXT 2
-#define END_TEXT 3
-#define END_TRANSMISSION 4
-#define ENQUIRY 5
-#define ACKNOWLEDGE 6
-#define NEG_ACKNOWLEDGE 21
-#define END_TRANSMISSION_BLOCK 23
-#define FILE_SEPARATOR 28
-#define GROUP_SEPARATOR 29
-#define RECORD_SEPARATOR 30
-#define UNIT_SEPARATOR 31
-#define CONTROL_KEY 17
-#define CONTROL_END 20
-#define CANCEL 24
-#define END_OF_MEDIUM 25
+#define NULL_BYTE 0 // basically a no-operation
+#define START_HEADER 1 // control1 indicates number of extra bytes
+#define START_TEXT 2 // contol1 - num of elements, control2 - size of each element
+#define END_TEXT 3 // TODO
+#define END_TRANSMISSION 4 // TODO
+#define ENQUIRY 5 // basically a ping
+#define ACKNOWLEDGE 6 // signal was received, control1 is recieved status
+#define WAKEUP 7 // wake sleeping connection
+#define SHIFT_OUT 14 // TODO
+#define SHIFT_IN 15 // TODO
+#define START_DATA 16 // TODO
+#define CONTROL_KEY 17 // special action 1
+#define CONTROL_END 20 // special action 4
+#define NEG_ACKNOWLEDGE 21 // received status/message is incorrect/invalid, control1 is status
+#define IDLE 22 // go to sleep, only accept wakeup or escape as signals
+#define END_TRANSMISSION_BLOCK 23 // TODO
+#define CANCEL 24 // TODO
+#define END_OF_MEDIUM 25 // TODO
+#define SUBSTITUTE 26 // TODO
+#define ESCAPE 27 // Disconnect, waits for acknowledge (useful for cleanup)
+#define FILE_SEPARATOR 28 // TODO
+#define GROUP_SEPARATOR 29 // TODO
+#define RECORD_SEPARATOR 30 // TODO
+#define UNIT_SEPARATOR 31 // TODO
 
 #define CONNECTION_QUEUE 5
 #define MAX_CONNECTIONS 20
@@ -84,6 +87,8 @@ typedef struct packet Packet;
  * Returns 0 on success, -1 on error and 1 if the list of clients is full.
  */
 int setup_new_client(const int listen_fd, Client *clients[]);
+
+int establish_server_connection(const int port, const char *address, Client *cli);
 
 /*
  * Frees the client at the given index in the given array.
@@ -135,20 +140,27 @@ int send_fstr_to_client(Client *cli, const char *format, ...);
 
 int read_header(Client *cli);
 
+int parse_ext_header(Client *cli, char header[PACKET_LEN]);
+
 int parse_text(Client *cli, const int control1, const int control2);
 
 int parse_enquiry(Client *cli, const int control1);
 
-int parse_acknowledge(Client *cli);
+int parse_acknowledge(Client *cli, const int control1);
 
-int parse_neg_acknowledge(Client *cli);
+int parse_neg_acknowledge(Client *cli, const int control1);
 
-int parse_cancel(Client *cli);
+int parse_escape(Client *cli);
 
 
 /*
  * Utility Functions
  */
+
+/*
+ * Copies given data into a given packet struct
+ */
+int assemble_packet(Packet *pack, char header[PACKET_LEN], const char *buf, const int buf_len);
 
 /*
  * Prints requested format string into stderr, prefixing properly
@@ -168,6 +180,6 @@ int reset_buffer_struct(Buffer *buffer);
 /*
  * Zeroes out all the fields of a given segment structure.
  */
-int reset_segment_struct(Packet *pack);
+int reset_packet_struct(Packet *pack);
 
 #endif

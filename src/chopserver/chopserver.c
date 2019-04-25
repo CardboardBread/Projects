@@ -9,8 +9,9 @@
 #include "socket.h"
 #include "chophelper.h"
 
-#define TIMEOUT_SEC 10
-#define TIMEOUT_USEC 0
+#ifndef PORT
+  #define PORT 50001
+#endif
 
 const char server_header[] = "[SERVER] %s\n";
 const char client_header[] = "[CLIENT %d] %s\n";
@@ -30,8 +31,7 @@ void sigint_handler(int code);
  * SIGINT handler:
  * We are just raising the sigint_received flag here. Our program will
  * periodically check to see if this flag has been raised, and any necessary
- * work will be done in main() and/or the helper functions. Write your signal
- * handlers with care, to avoid issues with async-signal-safety.
+ * work will be done in main() and/or the helper functions.
  */
 void sigint_handler(int code) {
   debug_print("sigint_handler: received SIGINT, setting flag");
@@ -48,21 +48,21 @@ int main(void) {
   sigemptyset(&act1.sa_mask);
   act1.sa_flags = SA_RESTART; // ensures interrupted calls dont error out
   if (sigaction(SIGINT, &act1, NULL) < 0) {
-    debug_print("SIGINT handler: ");
+    debug_print("SIGINT handler: error");
     exit(1);
   }
 
   // setup server address
   struct sockaddr_in *self = init_server_addr(PORT);
   if (self == NULL) {
-    debug_print("init_server_addr: ");
+    debug_print("init_server_addr: error");
     exit(1);
   }
 
   // setup server socket
   int sock_fd = setup_server_socket(self, CONNECTION_QUEUE);
   if (sock_fd < MIN_FD) {
-    debug_print("setup_server_socket: ");
+    debug_print("setup_server_socket: error");
     exit(1);
   }
 
@@ -88,7 +88,7 @@ int main(void) {
       if (errno == EINTR) {
         continue;
       } else {
-        debug_print("main: ");
+        debug_print("select: non-interrupt error");
         exit(1);
       }
     }

@@ -42,13 +42,32 @@ int setup_new_client(const int listen_fd, Client *clients[]) {
       debug_print("setup_new_client: placed client at index %d", i);
       return fd;
     }
-
   }
 
   // close the connection since we can't store it
   close(fd);
   debug_print("setup_new_client: no empty space for client found, closing connection");
   return -1;
+}
+
+int establish_server_connection(const int port, const char *address, Client *cli) {
+  if (port < 0 || address == NULL || cli == NULL) {
+    debug_print("establish_server_connection: invalid arguments");
+    return -1;
+  }
+
+  int fd = connect_to_server(port, address);
+  if (fd < MIN_FD) {
+    debug_print("establish_server_connection: failed to connect to server");
+    return -1;
+  }
+  debug_print("establish_server_connection: connected to server");
+
+  cli->buffer = (Buffer *) malloc(sizeof(Buffer));
+  reset_client_struct(cli);
+  cli->socket_fd = fd;
+
+  return fd;
 }
 
 int remove_client(const int client_index, Client *clients[]) {
@@ -238,44 +257,64 @@ int read_header(Client *cli) {
     }
   }
 
+  // mark client incoming flag
+  cli->inc_flag = head[PACKET_STATUS];
+
   // parse the status
+  int status;
   switch(head[PACKET_STATUS]) {
-    case 0: // NULL
+    case NULL_BYTE:
       debug_print("read_header: received NULL header");
       break;
 
-    case 1: // Header
+    case START_HEADER:
       debug_print("read_header: received extended header");
-      // TODO: implement
+      status = parse_ext_header(cli, head);
       break;
 
-    case 2: // Text
+    case START_TEXT:
       debug_print("read_header: received text header");
-      return parse_text(cli, head[PACKET_CONTROL1], head[PACKET_CONTROL2]);
+      status = parse_text(cli, head[PACKET_CONTROL1], head[PACKET_CONTROL2]);
+      break;
 
-    case 5: // Enquiry
+    case ENQUIRY:
       debug_print("read_header: received enquiry header");
-      return parse_enquiry(cli, head[PACKET_CONTROL1]);
+      status = parse_enquiry(cli, head[PACKET_CONTROL1]);
+      break;
 
-    case 6: // Acknowledge
+    case ACKNOWLEDGE:
       debug_print("read_header: received acknowledge header");
-      return parse_acknowledge(cli);
+      status = parse_acknowledge(cli, head[PACKET_CONTROL1]);
+      break;
 
-    case 21: // Neg Acknowledge
+    case WAKEUP:
+      debug_print("read_header: received wakeup header");
+      //status = parse_wakeup();
+      break;
+
+    case NEG_ACKNOWLEDGE:
       debug_print("read_header: received negative acknowledge header");
-      return parse_neg_acknowledge(cli);
+      status = parse_neg_acknowledge(cli);
+      break;
 
-    case 24: // Cancel
-      debug_print("read_header: received cancel header");
-      return parse_cancel(cli);
+    case IDLE:
+      debug_print("read_header: received idle header");
+      //status = parse_idle();
+      break;
+
+    case ESCAPE:
+      debug_print("read_header: received escape header");
+      status = parse_escape(cli);
+      break;
 
     default: // unsupported/invalid
       debug_print("read_header: received invalid header");
-      return -1;
+      status = -1;
+      break;
 
   }
 
-  return 0;
+  return status;
 }
 
 int parse_text(Client *cli, int count, int width) {
@@ -313,12 +352,95 @@ int parse_text(Client *cli, int count, int width) {
   return 0;
 }
 
-int parse_cancel(Client *cli) {
-  // precondition for invalid argument
-  if (cli == NULL) {
-    debug_print("parse_cancel: invalid arguments");
+int parse_enquiry(Client *cli, const int control1) {
+  if (cli == NULL || control1 < 0) {
+    debug_print("parse_enquiry: invalid arguments");
     return -1;
   }
+
+  // initializing packet struct
+  Packet pack;
+  reset_packet_struct(&pack);
+
+  // setting values of header
+  char header[PACKET_LEN] = {0};
+  header[PACKET_STATUS] = ACKNOWLEDGE;
+  header[PACKET_CONTROL1] = ENQUIRY;
+
+  // copy into struct, send to client
+  assemble_packet(&pack, header, NULL, 0);
+  return write_packet_to_client(cli, &pack);
+}
+
+int parse_acknowledge(Client *cli, const int control1) {
+  // precondition for invalid argument
+  if (cli == NULL || control1 < 0) {
+    debug_print("parse_acknowledge: invalid arguments");
+    return -1;
+  }
+
+  switch(control1) {
+    case ENQUIRY:
+      // TODO: response to ping
+      break;
+    case WAKEUP:
+      // TODO: the sender says it has woken up
+      break;
+    case IDLE:
+      // TODO: the sender says it has gone asleep
+      break;
+    case ESCAPE:
+      // TOOD: the sender knows you're stopping
+      break;
+  }
+
+  return 0;
+}
+
+int parse_neg_acknowledge(Client *cli, const int control1) {
+  // precondition for invalid argument
+  if (cli == NULL || control1 < 0) {
+    debug_print("parse_neg_acknowledge: invalid arguments");
+    return -1;
+  }
+
+  switch(control1) {
+    case ENQUIRY:
+      // TODO: ping refused
+      break;
+    case WAKEUP:
+      // TODO: sender is already awake
+      break;
+    case IDLE:
+      // TODO: sender is already sleeping
+      break;
+    case ESCAPE:
+      // TODO: you cannot disconnect
+      break;
+  }
+
+  return 0;
+}
+
+int parse_escape(Client *cli) {
+  // precondition for invalid argument
+  if (cli == NULL) {
+    debug_print("parse_escape: invalid arguments");
+    return -1;
+  }
+
+  // initializing packet struct
+  Packet pack;
+  reset_packet_struct(&pack);
+
+  // setting values of header
+  char header[PACKET_LEN] = {0};
+  header[PACKET_STATUS] = ACKNOWLEDGE;
+  header[PACKET_CONTROL1] = ESCAPE;
+
+  // copy into struct, send to client
+  assemble_packet(&pack, header, NULL, 0);
+  write_packet_to_client(cli, &pack);
 
   // marking this client as closed
   cli->inc_flag = -1;
@@ -330,6 +452,25 @@ int parse_cancel(Client *cli) {
 /*
  * Utility Functions
  */
+
+int assemble_packet(Packet *pack, const char header[PACKET_LEN], const char *buf, const int buf_len) {
+  // precondition for invalid arguments
+  if (pack == NULL || header == NULL || (buf == NULL && buf_len != 0) || (buf != NULL && buf_len < 1)) {
+    debug_print("assemble_packet: invalid arguments");
+    return -1;
+  }
+
+  // copy header into packet
+  memmove(pack->head, header, PACKET_LEN);
+
+  // copy message into packet
+  memmove(pack->buf, buf, buf_len);
+
+  // set message length
+  pack->inbuf = buf_len;
+
+  return 0;
+}
 
 // errno is preserved through this function,
 // it will not change between this function calling and returning.
