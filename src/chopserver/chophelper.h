@@ -9,10 +9,33 @@
   #define PORT 50001
 #endif
 
-#define MESG_LEN 128
-#define HEAD_LEN 4
-#define TAIL_LEN 4
-#define DATA_LEN 120
+#define PACKET_LEN 4
+#define TEXT_LEN 255
+
+/// Header Packet bytes
+#define PACKET_HEAD 0 // currently no purpose
+#define PACKET_STATUS 1 // defines what this packet means
+#define PACKET_CONTROL1 2 // parameter 1 for packet type
+#define PACKET_CONTROL2 3 // parameter 2 for packet type
+
+/// status bytes
+#define NULL_BYTE 0
+#define HEADER_BYTE 1
+#define START_TEXT 2
+#define END_TEXT 3
+#define END_TRANSMISSION 4
+#define ENQUIRY 5
+#define ACKNOWLEDGE 6
+#define NEG_ACKNOWLEDGE 21
+#define END_TRANSMISSION_BLOCK 23
+#define FILE_SEPARATOR 28
+#define GROUP_SEPARATOR 29
+#define RECORD_SEPARATOR 30
+#define UNIT_SEPARATOR 31
+#define CONTROL_KEY 17
+#define CONTROL_END 20
+#define CANCEL 24
+#define END_OF_MEDIUM 25
 
 #define CONNECTION_QUEUE 5
 #define MAX_CONNECTIONS 20
@@ -43,22 +66,17 @@ typedef struct socket_buffer Buffer;
 
 struct client {
 	int socket_fd;
+  int op_flag;
 	struct socket_buffer *buffer;
 };
 typedef struct client Client;
 
 struct packet {
-	char buf[MESG_LEN];
-	int inbuf;
-  struct packet *next;
+  char head[PACKET_LEN];
+	char buf[TEXT_LEN];
+  int inbuf;
 };
 typedef struct packet Packet;
-
-struct message {
-  struct packet *first;
-  int seg_count;
-};
-typedef struct message Message;
 
 /*
  * Socket-Layer functions
@@ -81,25 +99,27 @@ int remove_client(int client_index, Client *clients[]);
 /*
  * Writes data to the given socket, assuming msg is the beginning of an array
  * of msg_len length.
- * Refuses to send messages that are too large to fit in a single packet
+ * Automatically packages the given data into a text style packet.
+ * Refuses to send messages that are too large to fit in a single text packet.
  * Returns 0 on success, -1 on error, and 1 on an imcomplete/failed write.
  * ERRNO will be preserved from the write call.
  */
-int write_buf_to_client(int client_fd, char *msg, int msg_len);
+int write_buf_to_client(Client *cli, const char *msg, const int msg_len);
 
 /*
  * Writes the given packet to the given socket.
  * Returns 0 on success, -1 on error, and 1 on an imcomplete/failed write.
  * ERRNO will be preserved from the write call.
  */
-int write_packet_to_client(int client_fd, Packet *pack);
+int write_packet_to_client(Client *cli, Packet *pack);
 
 /*
- * Writes all the segments in a given message to the given socket.
- * Assumes the chain of segments is NULL terminated.
+ * Writes the given string to the given client.
+ * Assumes the string is null-terminated, unpredictable behaviour otherwise.
  * Returns 0 on success, -1 on error, and 1 on an imcomplete/failed write.
+ * ERRNO will be preserved from the write call.
  */
-int send_message_to_client(int client_fd, Message *msg);
+int send_str_to_client(Client *cli, const char *str);
 
 /*
  * Writes a given format string to the given socket.
@@ -107,15 +127,11 @@ int send_message_to_client(int client_fd, Message *msg);
  * Returns 0 on success, -1 on error, and 1 on an imcomplete/failed write.
  * ERRNO will be preserved from the write call.
  */
-int send_fstr_to_client(int client_fd, const char *format, ...);
+int send_fstr_to_client(Client *cli, const char *format, ...);
 
 /*
  * Data-Layer functions
  */
-
-Message *partition_message(char *msg, int msg_len);
-
-int append_to_message(Message *msg, char *buf, int buf_len);
 
 /*
  * Replaces the first '\n' or '\r\n' found in str with a null terminator.
@@ -202,17 +218,8 @@ int reset_client_struct(Client *client);
 int reset_buffer_struct(Buffer *buffer);
 
 /*
- * Zeroes out all of the fields and segments of a given message structure.
- */
-int reset_message_struct(Message *message);
-
-/*
  * Zeroes out all the fields of a given segment structure.
  */
 int reset_segment_struct(Packet *pack);
-
-int set_packet_head(char buf[MESG_LEN], char a, char b, char c, char d);
-
-int set_packet_head(char buf[MESG_LEN], char a, char b, char c, char d);
 
 #endif

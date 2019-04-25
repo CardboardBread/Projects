@@ -74,9 +74,9 @@ int remove_client(int client_index, Client *clients[]) {
   return 0;
 }
 
-int write_buf_to_client(int client_fd, char *msg, int msg_len) {
+int write_buf_to_client(Client *cli, const char *msg, const int msg_len) {
   // precondition for invalid arguments
-  if (client_fd < MIN_FD || msg == NULL || msg_len < 0) {
+  if (cli == NULL || msg == NULL || msg_len < 0) {
     debug_print("write_buf_to_client: invalid arguments");
     return -1;
   }
@@ -88,25 +88,37 @@ int write_buf_to_client(int client_fd, char *msg, int msg_len) {
   }
 
   // check if message is too long
-  if (msg_len > DATA_LEN) {
+  if (msg_len > TEXT_LEN) { // TODO: negotiate a 'long message' for text with more than 255 bytes
     debug_print("write_buf_to_client: message is too long");
     return 1;
   }
 
-  // remove newline on message
-  if (remove_newline(msg, msg_len) < 0) {
-    debug_print("write_buf_to_client: failed to remove newline from message");
+  // assemble header with text signals
+  char head[PACKET_LEN] = {0};
+  head[PACKET_STATUS] = (char) START_TEXT;
+  head[PACKET_CONTROL1] = (char) msg_len;
+
+  // write header packet to target
+  int head_written = write(cli->socket_fd, head, PACKET_LEN);
+  if (head_written != PACKET_LEN) {
+
+    // in case write was not perfectly successful
+    if (head_written < 0) {
+      debug_print("write_buf_to_client: failed to write header to client");
+      return 1;
+    } else {
+      debug_print("write_buf_to_client: wrote incomplete header to client");
+      return 1;
+    }
   }
 
-  // assemble message with network newline
-  char buf[MESG_LEN] = {0};
-  buf[0] = 0;
-  buf[HEAD_LEN + DATA_LEN] = 0;
-  int total = snprintf(buf + HEAD_LEN, DATA_LEN, "%.*s", msg_len, msg);
+  // assemble message into buffer
+  char buf[TEXT_LEN] = {0};
+  snprintf(buf, TEXT_LEN, "%.*s", msg_len, msg);
 
   // write message to target
-  int bytes_written = write(client_fd, buf, total);
-  if (bytes_written != total) {
+  int bytes_written = write(cli->socket_fd, buf, msg_len);
+  if (bytes_written != msg_len) {
 
     // in case write was not perfectly successful
     if (bytes_written < 0) {
@@ -118,60 +130,78 @@ int write_buf_to_client(int client_fd, char *msg, int msg_len) {
     }
   }
 
-  debug_print("write_buf_to_client: wrote %d bytes to client", total);
+  debug_print("write_buf_to_client: wrote text packet of %d bytes to client", bytes_written);
   return 0;
 }
 
-int write_packet_to_client(int client_fd, Packet *pack) {
-
-}
-
-int send_message_to_client(int client_fd, Message *msg) {
+int write_packet_to_client(Client *cli, Packet *pack) {
   // precondition for invalid arguments
-  if (client_fd < MIN_FD || msg == NULL) {
-    debug_print("send_message_to_client: invalid arguments");
+  if (cli == NULL || pack == NULL) {
+    debug_print("write_packet_to_client: invalid arguments");
     return -1;
   }
 
-  // if message is empty
-  if (msg->first == NULL) {
-    debug_print("send_message_to_client: message is empty");
-    return 0;
-  }
+  // mark client with packet status
+  cli->op_flag = pack->head[PACKET_STATUS];
 
-  char *head;
-  int status;
-  int msg_len;
-  Segment *cur;
-  for (cur = msg->first; cur != NULL; cur = cur->next) {
-    head = cur->buf;
-    msg_len = cur->inbuf;
-    status = write_buf_to_client(client_fd, head, msg_len);
-    if (status < 0 || status > 0) {
-      debug_print("send_message_to_client: failed writing entire message");
+  // write header packet to target
+  int head_written = write(cli->socket_fd, pack->head, PACKET_LEN);
+  if (head_written != PACKET_LEN) {
+
+    // in case write was not perfectly successful
+    if (head_written < 0) {
+      debug_print("write_packet_to_client: failed to write header to client");
+      return 1;
+    } else {
+      debug_print("write_packet_to_client: wrote incomplete header to client");
       return 1;
     }
   }
 
-  debug_print("send_message_to_client: wrote a message with %d segments", msg->seg_count);
+  // write message to target (if any)
+  int bytes_written = write(cli->socket_fd, pack->buf, pack->inbuf);
+  if (bytes_written != pack->inbuf) {
+
+    // in case write was not perfectly successful
+    if (bytes_written < 0) {
+      debug_print("write_packet_to_client: failed to write message to client");
+      return 1;
+    } else {
+      debug_print("write_packet_to_client: wrote incomplete message to client");
+      return 1;
+    }
+  }
+
+  debug_print("write_packet_to_client: wrote packet of %d bytes to client", bytes_written);
   return 0;
 }
 
-int send_fstr_to_client(int client_fd, const char *format, ...) {
+int send_str_to_client(Client *cli, char *str) {
+  // precondition for invalid arguments
+  if (cli == NULL || str == NULL) {
+    debug_print("send_str_to_client: invalid arguments");
+    return -1;
+  }
+
+  return write_buf_to_client(cli, str, strlen(str));
+}
+
+int send_fstr_to_client(Client *cli, const char *format, ...) {
   // precondition for invalid argument
-  if (client_fd < MIN_FD) {
+  if (cli == NULL) {
     debug_print("send_fstr_to_client: invalid arguments");
     return -1;
   }
 
-  char msg[BUFSIZE + 1];
+  // buffer for assembling format string
+  char msg[TEXT_LEN + 1];
 
   va_list args;
   va_start(args, format);
-  vsnprintf(msg, BUFSIZE, format, args);
+  vsnprintf(msg, TEXT_LEN, format, args);
   va_end(args);
 
-  return write_buf_to_client(client_fd, msg, BUFSIZE);
+  return write_buf_to_client(cli, msg, TEXT_LEN);
 }
 
 /*
@@ -518,29 +548,6 @@ int reset_buffer_struct(Buffer *buffer) {
   return 0;
 }
 
-int reset_message_struct(Message *message) {
-  // precondition for invalid argument
-  if (message == NULL) {
-    debug_print("reset_message_struct: invalid arguments");
-    return -1;
-  }
-
-  // free every node in the message
-  Packet *cur;
-  Packet *last = NULL;
-  for (cur = message->first; cur != NULL; cur = cur->next) {
-    free(last);
-    last = cur;
-  }
-  free(last);
-
-  // reset struct fields
-  message->first = NULL;
-  message->seg_count = 0;
-
-  return 0;
-}
-
 int reset_packet_struct(Packet *pack) {
   // precondition for invalid argument
   if (pack == NULL) {
@@ -549,42 +556,9 @@ int reset_packet_struct(Packet *pack) {
   }
 
   // reset struct fields
-  memset(pack->buf, 0, MESG_LEN);
+  memset(pack->head, 0, PACKET_LEN);
+  memset(pack->buf, 0, TEXT_LEN);
   pack->inbuf = 0;
-
-  return 0;
-}
-
-int set_packet_tail(char buf[MESG_LEN], char a, char b, char c, char d) {
-  // precondition for invalid argument
-  if (buf == NULL) {
-    debug_print("set_packet_tail: invalid arguments");
-    return -1;
-  }
-
-  // setting head
-  int offset = 0;
-  buf[offset + 0] = a;
-  buf[offset + 1] = b;
-  buf[offset + 2] = c;
-  buf[offset + 3] = d;
-
-  return 0;
-}
-
-int set_packet_head(char buf[MESG_LEN], char a, char b, char c, char d) {
-  // precondition for invalid argument
-  if (buf == NULL) {
-    debug_print("set_packet_head: invalid arguments");
-    return -1;
-  }
-
-  // setting tail
-  int offset = DATA_LEN + HEAD_LEN;
-  buf[offset + 0] = a;
-  buf[offset + 1] = b;
-  buf[offset + 2] = c;
-  buf[offset + 3] = d;
 
   return 0;
 }
